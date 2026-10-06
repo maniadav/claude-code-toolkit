@@ -1,387 +1,568 @@
-# Architectural Plan: Scoped Agent & Skill Orchestration System
+# Final Implementation Plan: Scoped Agent & Skill Orchestration System (`claude-code-toolkit`)
 
 > **Status:** Proposal / Planning Phase (Implementation Pending Approval)  
-> **Repository:** `claude-code-toolkit`  
-> **Author:** Antigravity AI Engineering Team  
-> **Target Date:** October 2026  
+> **Target Repository:** `claude-code-toolkit`  
+> **Author:** Senior AI Engineering Team  
+> **Date:** October 2026  
 
 ---
 
 ## 1. Executive Summary
 
-This document defines the architecture and implementation plan for a **thin, globally accessible orchestration and resolution layer** built on top of the `claude-code-toolkit` monorepo.
+This document defines the **final, authoritative implementation plan** for building a **globally accessible, agent-agnostic, scoped discovery and invocation layer** (`ctk`) on top of the `claude-code-toolkit` monorepo.
 
-### The Problem
-The `claude-code-toolkit` repository aggregates 13 external Git submodules, custom skills (`my-custom-skills`), and workspace reference patterns (`maniadav-agent-workspace`). These repositories vary drastically in purpose, execution model, discovery mechanism, and agent target. Indiscriminately exposing all submodules as skills to an AI agent causes:
-- **Token bloat & context pollution**: Thousands of `SKILL.md` instructions loaded simultaneously.
-- **Cross-repository instruction bleed & collisions**: Conflicting guidelines for similar tasks (e.g., TDD vs rapid prototyping).
-- **Execution model confusion**: Treating an MCP launcher (`claude-code-mcp`), an AST parser (`claude-context`), or a CI action (`claude-code-action`) as a prompt skill breaks agent tools.
+### Core Mission
+The `claude-code-toolkit` monorepo aggregates 13 external Git submodules, custom skills (`my-custom-skills`), and workspace reference patterns (`maniadav-agent-workspace`). These repositories are highly heterogeneous, spanning skill libraries, multi-agent harness operating systems, MCP server bridges, AST indexers, and CI/CD runners. 
 
-### The Solution
-We propose a **Scoped Discovery System**. The root layer will **NOT** merge submodule formats into a single universal schema, nor will it execute unguided AI semantic search across all submodules. Instead, it provides:
-1. **Type-Aware Scoped Discovery**: Routing prompt skills, MCP bridges, CLI binaries, and CI actions according to their native type.
-2. **Explicit Source Selection**: Activating only the user-specified namespace (e.g., `@ECC`, `@superpowers`, `@custom/ui-ux`).
-3. **Exact Artifact Resolution**: Directly resolving targeted skills/agents across single or multi-level nested directories (e.g., `@awesome-claude-skills/theme-factory` or `@ECC/git-commit`).
-4. **Native Methodology Preservation**: When a namespace is selected, its native installation, discovery, and execution mechanics govern runtime behavior.
-5. **Global System Access**: Enabling any coding repository on the machine (`cd ~/any-project`) to invoke scoped skills without duplicating files into every local workspace.
+Our goal is **NOT** to flatten or merge these systems into a single universal skill format.  
+Our goal is to build a **thin, globally accessible orchestration and discovery layer** that enables explicit, scoped selection of submodules and exact artifacts from any directory on the host machine (`cd ~/any-project`), while preserving 100% of each submodule's native installation, discovery, execution, and runtime methodology.
 
 ---
 
-## 2. Current Repository Analysis
+## 2. System Requirements & Constraints
 
-An empirical inspection of all 13 submodules, custom space, and reference workspaces in `claude-code-toolkit` reveals that the submodules are **not homogeneous skill collections**. They span 7 distinct operational categories with different directory depth patterns.
+### A. Hard Requirements
+1. **Unify Addressing and Access, Not Methodologies**: The system must preserve each source repository's native installation, discovery, execution, and runtime methodology.
+2. **NO GLOBAL SEMANTIC DISCOVERY**: If the user provides a prompt without an explicit source (e.g. *"Implement feature X"*), the toolkit system MUST NOT search submodules, rank skills across repositories, or load prompt context. The AI agent operates normally without CTK interference.
+3. **Explicit Scoped Discovery**: When a source is identified (e.g., `@ECC`, `@superpowers`, `@custom`), **only** that source is activated, delegating to that source's native discovery mechanics.
+4. **Deterministic Exact Resolution**: Exact artifact addressing (e.g., `@source/artifact`) must resolve deterministically. **Unsafe fuzzy matching is strictly prohibited**. 
+   - 0 matches $\rightarrow$ Clear error.
+   - 1 match $\rightarrow$ Resolve.
+   - $>1$ matches $\rightarrow$ Ambiguity error displaying candidate canonical paths.
+5. **Type-Aware Routing**: Do NOT extract/inject everything as raw Markdown. Skills load via skill loaders; MCP servers register via `mcp_config.json`; CLI tools invoke via terminal commands; CI actions generate workflow files.
+6. **Agent-Agnostic Core (`ctk` CLI)**: The underlying system must be a standalone CLI utility (`ctk`), independent of any specific coding agent. Agent-specific integration layers (adapters) call this core.
+7. **Global System Access**: Setup occurs once inside `claude-code-toolkit` (`./install.sh`). The system is immediately usable from any directory on the user's machine (`cd ~/Projects/app`) without copying toolkit files.
 
-### Verified Inventory & Directory Depth Analysis
+### B. Desirable Features
+- Fast, static/generated capability registry (`~/.config/ctk/registry.json`).
+- Re-indexing integration during submodule updates (`npm run update`).
+- Clean user-space teardown script (`./uninstall.sh`).
 
-| Repository | Primary Content | `SKILL.md` Count | Directory Structure Pattern | Build Artifacts / Role |
-|---|---|---|---|---|
-| **`Ay-Skills`** | Browser & UI/UX Skill Library | 6 | Flat: `skills/<name>/SKILL.md` | Pure Markdown |
-| **`ECC`** | Full Harness OS, CLI & Safety Shims | 934 | Mixed: `skills/`, `plugins/`, `scaffolds/` | `install.sh`, `package.json`, `pyproject.toml`, `agent.yaml` |
-| **`awesome-claude-code`** | Resource Curation Index | 0 | Flat Markdown Index | `Makefile`, `generate_readme.py`, `config.yaml` |
-| **`awesome-claude-code-toolkit`** | Agent & Skill Registry | 40 | Flat: `skills/<name>/SKILL.md` | Manifests, plugins, commands, rules, MCP configs |
-| **`awesome-claude-skills`** | Composio Skill Collection | 864 | **2-Level Nested**: `<category>/<skill>/SKILL.md` | Pure Markdown |
-| **`claude-code-action`** | GitHub Action CI/CD Runner | 0 | Action codebase | Bun runtime, `package.json`, TypeScript action code |
-| **`claude-code-best-practice`** | Guidelines & Rules Templates | 0 | Guidelines & Tutorials | Tutorials, workflows, `CLAUDE.md` templates |
-| **`claude-code-mcp`** | Claude CLI MCP Server Bridge | 0 | Node.js MCP Server | Node.js MCP server exposing `claude_code` CLI tool |
-| **`claude-code-ultimate-guide`** | Reference Docs & Skill Hybrid | 83 | Nested: `tools/<skill>/SKILL.md` | Claudedocs, quizzes, whitepapers, `SKILL.md` files |
-| **`claude-context`** | AST Codebase Indexing Engine | 0 | Node/Python Package | Node.js + Python package (`pnpm-workspace.yaml`, CLI) |
-| **`claude-skills`** | Enterprise Multi-Agent Suite | 388 | **2-Level Nested**: `<domain>/<skill>/SKILL.md` | `pyproject.toml`, `tessl.json`, agent launcher scripts |
-| **`github-mcp-server`** | Official GitHub MCP Server | 0 | Go Server Codebase | Go runtime (`go.mod`, `cmd/`, Dockerfile) |
-| **`superpowers`** | TDD Agentic Workflow Engine | 15 | Flat: `skills/<name>/SKILL.md` | Node.js runtime (`package.json`, hooks, multi-agent plugins) |
-| **`my-custom-skills/`** | Personal Skill Directory | Variable | Flat: `skills/<name>/SKILL.md` | User-owned custom skills |
-| **`maniadav-agent-workspace`**| Cross-Agent Rule Reference | 1 | Multi-Agent rules (`antigravity`, `cursor`, `copilot`) | Antigravity, Cursor, Copilot rule guidelines |
+### C. Explicitly Rejected Behavior
+- ❌ **No Global Semantic Search**: No automatic scanning of all `SKILL.md` files across submodules when no source is specified.
+- ❌ **No Schema Flattening**: No converting complex multi-agent harnesses (`ECC`, `superpowers`) into static `SKILL.md` prompts.
+- ❌ **No Unsafe Fuzzy Matching**: No silently guessing between `category-a/foo` and `category-b/foo`.
+- ❌ **No Implicit Multi-Source Merging**: No automatic mixing of competing methodologies (e.g. blending `superpowers` TDD with un-tested prototyping skills).
+- ❌ **No Destructive Submodule Edits**: No modifying third-party submodule files directly.
 
 ---
 
-## 3. Submodule Classification & Type Routing
+## 3. Detailed Repository & Submodule Analysis
 
-Based on empirical inspection, submodules are categorized into 7 functional types:
+An empirical inspection of all 15 sources in `claude-code-toolkit` establishes their exact composition and runtime characteristics:
 
-```text
-                                +---------------------------------------+
-                                |      claude-code-toolkit Monorepo     |
-                                +-------------------+-------------------+
-                                                    |
-         +------------------+-----------------------+-----------------------+------------------+
-         |                  |                       |                       |                  |
-         v                  v                       v                       v                  v
-+------------------+ +--------------+       +---------------+       +--------------+   +---------------+
-|  Skill Libraries | | Harness OS & |       | Reference &   |       | CLI Tools &  |   | MCP Servers & |
-|                  | | Workflow     |       | Documentation |       | Infrastructure|  | Action Runners|
-| • Ay-Skills      | | • ECC        |       | • awesome-c-c |       | • claude-    |   | • github-mcp  |
-| • awesome-skills | | • superpowers|       | • c-best-prac |       |   context    |   | • c-code-mcp  |
-| • claude-skills  | +--------------+       | • c-ultimate  |       +--------------+   | • c-code-     |
-| • my-custom      |                        +---------------+                          |   action      |
-+------------------+                                                                   +---------------+
-```
-
-1. **Executable Skill Libraries**: Pure Markdown skill collections loaded on-demand (`Ay-Skills`, `awesome-claude-skills`, `claude-skills`, `my-custom-skills`).
-2. **Harness & Workflow Engines**: Systems enforcing stateful multi-agent workflows, TDD discipline, or terminal hooks (`ECC`, `superpowers`).
-3. **Reference & Rules Registries**: Static knowledge, curations, and prompt standards (`awesome-claude-code`, `claude-code-best-practice`, `maniadav-agent-workspace`).
-4. **Hybrid Reference & Skill Suites**: Combined technical guides and executable skills (`claude-code-ultimate-guide`, `awesome-claude-code-toolkit`).
-5. **CLI Infrastructure Tools**: Executable binaries for context packing and AST processing (`claude-context`).
-6. **MCP Server Bridges & Tooling**: Model Context Protocol servers exposing tool execution capability to non-Claude agents (`github-mcp-server`, `claude-code-mcp`).
-7. **CI/CD Action Runners**: Automation components for continuous integration (`claude-code-action`).
+| Source Repository | Executable Type | `SKILL.md` Count | Directory Depth Pattern | Build / Runtime Dependencies | Primary Role & Capabilities |
+|---|---|---|---|---|---|
+| **`Ay-Skills`** | Skill Library | 6 | Flat: `skills/<skill>/SKILL.md` | Pure Markdown | Remotion video generation, Puppeteer browser automation, UI/UX tokens, SEO auditing. |
+| **`ECC`** | Harness OS | 934 | Mixed: `skills/`, `plugins/`, `scaffolds/` | `install.sh`, Node.js, Python, `agent.yaml` | Full harness operating system with terminal shims (`ecc-agentshield`), multi-agent task spawning, AST hooks. |
+| **`awesome-claude-code`** | Curation Index | 0 | Flat Markdown Curation Index | Python (`generate_readme.py`), `Makefile` | Curation index of external Claude Code plugins, workflows, and resources. Passive reference. |
+| **`awesome-claude-code-toolkit`** | Preset Registry | 40 | Flat: `skills/<skill>/SKILL.md` | Manifests, `.claude-plugin`, `.mcp.json` | Pre-configured MCP server configs, agent rules, workflow presets. |
+| **`awesome-claude-skills`** | Skill Library | 864 | **2-Level Nested**: `<category>/<skill>/SKILL.md` | Pure Markdown | Composio skill collection covering 800+ API integrations, document processing (XLSX, PDF, PPTX, DOCX), resume generation. |
+| **`claude-code-action`** | CI/CD Runner | 0 | Action Codebase (`base-action/`) | Bun runtime, `package.json`, TypeScript | Official Anthropic GitHub Action runner for headless PR code review automation in CI pipelines. |
+| **`claude-code-best-practice`** | Rules / Reference | 0 | Markdown Guidelines & Decks | `CLAUDE.md` templates, tutorials | Engineering guidelines, agent team orchestration standards, code quality rules templates. |
+| **`claude-code-mcp`** | MCP Server Bridge | 0 | Node.js MCP Server | Node.js (>= 20), `package.json`, Claude CLI | Exposes `claude_code:claude_code` tool endpoint over stdio/SSE, allowing non-Claude IDEs (Cursor/Codex/Antigravity) to run Claude CLI. |
+| **`claude-code-ultimate-guide`**| Hybrid Reference | 83 | Nested: `tools/<skill>/SKILL.md` | Markdown docs, quiz runners, Claudedocs | Master technical guide, architecture whitepapers, quiz suites, and 83 structural skill templates. |
+| **`claude-context`** | AST CLI Tool | 0 | Node.js + Python Monorepo | Node.js, `pnpm`, Python, `package.json` | Codebase AST parser and context packing engine providing 70% LLM context compression via `npx claude-context`. |
+| **`claude-skills`** | Enterprise Suite | 388 | **2-Level Nested**: `<domain>/<skill>/SKILL.md` | `pyproject.toml`, `tessl.json`, Python | Enterprise organizational skill suite (C-level advisor, business growth, engineering management). |
+| **`github-mcp-server`** | MCP Server | 0 | Go Server Codebase | Go (>= 1.21), `go.mod`, Dockerfile | Official GitHub Model Context Protocol server exposing native GitHub API tools (`create_issue`, `get_file`, `create_pull_request`). |
+| **`superpowers`** | Workflow Engine | 15 | Flat: `skills/<skill>/SKILL.md` | Node.js, `package.json`, multi-agent manifests | Agentic workflow engine enforcing strict Test-Driven Development (TDD), spec creation (`/brainstorm`, `/plan`), and subagent delegation. |
+| **`my-custom-skills`** | Custom Skill Space | Variable | Flat: `skills/<skill>/SKILL.md` | User Markdown & Scripts | User-owned custom skills directory tracked in monorepo, 100% protected from submodule git resets. |
+| **`maniadav-agent-workspace`**| Rules Workspace | 1 | Multi-Agent Rules Folders | Markdown (`antigravity/`, `cursor/`, `copilot/`) | Local reference rules implementation standardizing engineering principles across Antigravity (`AGENTS.md`), Cursor (`.cursorrules`), Copilot. |
 
 ---
 
 ## 4. Native Installation / Discovery / Invocation Matrix
 
-| Submodule | Category | Installation Mechanism | Native Discovery Mechanism | Native Invocation Mechanism | Runtime Behavior | Agent Specificity | Scope Target |
-|---|---|---|---|---|---|---|---|
-| **`Ay-Skills`** | Skill Library | None (Markdown) | Filesystem directory scan | Prompt intent match | Loads `SKILL.md` instructions | Agnostic | Project / Global |
-| **`ECC`** | Harness OS | `install.sh`, `npm`/`pip` | `agent.yaml`, custom CLI, AST hooks | `/ecc`, CLI `ecc-universal`, bash shims | Spawns harness shell & agent sub-tasks | Claude & Cursor tuned | Global CLI / Project |
-| **`awesome-claude-code`** | Reference Index | None | Manual README inspection | N/A (Documentation only) | Passive reading | Claude Code focused | Reference only |
-| **`awesome-claude-code-toolkit`** | Hybrid | Symlinks / Plugins | Directory manifests, `.claude-plugin` | Prompt intent / MCP tools | Injects prompts & MCP rules | Claude & Cursor | Project / Global |
-| **`awesome-claude-skills`** | Skill Library | None | Category directory scan | Prompt intent match | Loads `SKILL.md` instructions | Agnostic | Project / Global |
-| **`claude-code-action`** | CI/CD Runner | GitHub Actions / Bun | `.github/workflows/` runner | GitHub event trigger | Runs headlessly in CI container | Claude Code Action | Remote CI/CD |
-| **`claude-code-best-practice`** | Reference / Rules | Copy `CLAUDE.md` | Agent system prompt load | Passive prompt enforcement | Sets agent system constraints | Claude & Codex | Project / Global |
-| **`claude-code-mcp`** | MCP Server Bridge | `npm install` | `mcp_config.json` entry | MCP tool call `claude_code` | Wraps Claude CLI as MCP tool for Cursor/Codex | Non-Claude Agents | User-Global Config |
-| **`claude-code-ultimate-guide`**| Hybrid | Manual copy / view | Directory scan & quiz runners | Prompt intent & CLI tools | Injects guide specs & skills | Claude Code focused | Reference / Project |
-| **`claude-context`** | CLI Tool | `npm install -g` / `pnpm` | CLI argument parsing | `npx claude-context <path>` | Scans AST, outputs markdown context | Agnostic CLI | Host System |
-| **`claude-skills`** | Enterprise Multi-Agent | `pyproject.toml` / copy | `tessl.json`, YAML frontmatter | Prompt intent / agent launcher | Loads domain-specific skills | Claude & Gemini | Project / Global |
-| **`github-mcp-server`** | MCP Server | Go build / Docker | `mcp_config.json` entry | MCP tool call (e.g. `create_issue`) | Runs Go stdio server | Any MCP Agent | User-Global Config |
-| **`superpowers`** | Workflow Engine | `npm install`, plugin setup | Multi-agent plugin manifests (`.agents`, `.cursor-plugin`) | `/brainstorm`, `/plan`, TDD prompts | Enforces TDD, spawns subagents | Multi-agent (Claude/Cursor/Codex/AGY) | Project / Global |
-| **`my-custom-skills`** | Custom Skills | File addition | Directory scan | Prompt intent / `@custom/` | Loads custom instructions | Agnostic | User Monorepo |
-| **`maniadav-agent-workspace`**| Rules Workspace| Symlink rules | Agent rules load (`AGENTS.md`) | System prompt enforcement | Enforces engineering standards | Antigravity / Cursor / Copilot | User-Global / Project |
-
----
-
-## 5. Module-Level Refinements & Problems Identified
-
-Our deep inspection revealed 4 critical module-level details that require specialized handling in the orchestration layer:
-
-1. **Handling 2-Level Nested Skill Paths**:
-   - `awesome-claude-skills` structures skills as `awesome-claude-skills/<category>/<skill-name>/SKILL.md` (e.g. `awesome-claude-skills/document-skills/pdf-analyzer/SKILL.md`).
-   - `claude-skills` structures skills as `claude-skills/<domain>/<skill-name>/SKILL.md` (e.g. `claude-skills/engineering-team/code-review/SKILL.md`).
-   - *Refinement*: The artifact resolver MUST support fuzzy-depth matching so `@awesome-claude-skills/pdf-analyzer` or `@claude-skills/code-review` automatically resolves across subdirectories.
-
-2. **Non-Skill Submodule Resolution**:
-   - Typing `@claude-code-mcp` or `@github-mcp-server` should **NOT** inject markdown prompts. It triggers MCP server registration in `mcp_config.json`.
-   - Typing `@claude-context` resolves to a CLI command invocation contract (`npx claude-context . --output context.md`).
-   - Typing `@claude-code-action` resolves to a GitHub Actions YAML workflow generator.
-
-3. **Rule Reference Scoping (`maniadav-agent-workspace`)**:
-   - Mapped to `@workspace-rules` or `@maniadav`. Automatically resolves cross-agent rules (`AGENTS.md`, `.cursorrules`, `copilot-instructions.md`) based on the active IDE.
-
-4. **Skill Name Collisions & Competing Philosophies**:
-   - `superpowers` mandates strict TDD before writing code.
-   - Other skill modules permit immediate implementation without pre-existing failing tests.
-   - *Rule*: Explicit source namespace selection isolates these workflows completely.
-
----
-
-## 6. Proposed Architecture
-
-We propose a **Locator + Namespace + Adapter Architecture** operating as a thin orchestration layer.
-
 ```text
-+-----------------------------------------------------------------------------------------------+
-|                                    User Workspace (`~/any-project`)                           |
-|                      (Claude Code CLI / Antigravity IDE / Cursor / AGY / Codex)               |
-+-----------------------------------------------+-----------------------------------------------+
-                                                |
-                             Explicit Scoped Input (e.g., `@ECC/git-commit`)
-                                                |
-                                                v
-+-----------------------------------------------------------------------------------------------+
-|                                    Global Orchestration Layer                                 |
-|                                    (`~/.claude-toolkit-resolver`)                             |
-|                                                                                               |
-|   +--------------------------+   +--------------------------+   +-------------------------+   |
-|   |    Namespace Registry    |   |     Artifact Resolver    |   |      Agent Adapters     |   |
-|   |  Maps `@ECC`,            |   |  Type-aware & deep-path  |   |  Formats output for     |   |
-|   |  `@superpowers`, etc.    |   |  nested SKILL.md lookup  |   |  Claude/Cursor/AGY/etc. |   |
-|   +------------+-------------+   +------------+-------------+   +------------+------------+   |
-+----------------|------------------------------|------------------------------|----------------+
-                 |                              |                              |
-                 +------------------------------+------------------------------+
-                                                |
-                                 Delegates to Native Submodule
-                                                |
-                                                v
-+-----------------------------------------------------------------------------------------------+
-|                              `claude-code-toolkit` Monorepo Root                              |
-|                                                                                               |
-|  +--------------------+  +--------------------+  +--------------------+  +------------------+ |
-|  | ECC (Native)       |  | superpowers (Nat.) |  | Ay-Skills (Native) |  | my-custom-skills | |
-|  +--------------------+  +--------------------+  +--------------------+  +------------------+ |
-+-----------------------------------------------------------------------------------------------+
++-------------------------------------------------------------------------------------------------------------------------+
+| Submodule                      | Install Method           | Discovery Method          | Invocation Method            |
++--------------------------------+--------------------------+---------------------------+------------------------------+
+| Ay-Skills                      | None (Markdown)          | Filesystem scan           | Prompt intent match          |
+| ECC                            | install.sh / npm / pip   | agent.yaml / CLI          | /ecc, CLI ecc-universal      |
+| awesome-claude-code            | None                     | Manual README inspection  | Passive reading              |
+| awesome-claude-code-toolkit    | Copy / Symlink           | Directory manifests       | Prompt intent / MCP configs  |
+| awesome-claude-skills          | None                     | Category directory scan   | Prompt intent match          |
+| claude-code-action             | GitHub Actions / Bun     | .github/workflows/ runner | GitHub Actions PR trigger    |
+| claude-code-best-practice      | Copy CLAUDE.md           | System prompt load        | System prompt enforcement    |
+| claude-code-mcp                | npm install & build      | mcp_config.json entry     | MCP tool call claude_code    |
+| claude-code-ultimate-guide     | Manual view              | Directory scan & quizzes  | Prompt intent & CLI tools    |
+| claude-context                 | npm install -g / pnpm    | CLI argument parsing      | npx claude-context <path>    |
+| claude-skills                  | pyproject.toml / copy    | tessl.json / frontmatter  | Prompt intent / agent launch |
+| github-mcp-server              | Go build / Docker        | mcp_config.json entry     | MCP tool call create_issue   |
+| superpowers                    | npm install / plugins    | Plugin manifests (.agents)| /brainstorm, /plan, TDD      |
+| my-custom-skills               | File creation            | Filesystem scan           | Prompt intent / @custom      |
+| maniadav-agent-workspace       | Symlink rules            | Agent rules load          | System prompt enforcement    |
++-------------------------------------------------------------------------------------------------------------------------+
 ```
 
 ---
 
-## 7. Resolution Semantics
+## 5. Source Capability Model
 
-To eliminate ambiguity and cross-contamination, the system enforces strict resolution rules:
+Every registered source exhibits one or more explicit operational capabilities:
 
-### A. No Namespace (`"Implement feature X"`)
-- **Behavior**: The resolver is **NOT** invoked. Zero submodules are loaded.
-- **Rationale**: Prevents accidental context pollution and hallucinated skill mixing.
+```yaml
+capabilities:
+  - skill-library        # Contains SKILL.md prompt instructions
+  - harness-os           # Complete operating environment & subagent spawner
+  - workflow-engine      # Enforces stateful workflows (e.g. TDD, specs)
+  - mcp-server           # Exposes MCP tools over Stdio/SSE
+  - cli-tool             # Executable binary invoked via shell
+  - ci-runner            # GitHub Actions container runner
+  - reference-rules      # Engineering standards and system prompts
+```
 
-### B. Submodule Namespace (`@ECC` or `@superpowers`)
-- **Behavior**: Activates **only** the specified submodule. Loads its primary entry point / manifest and activates its native discovery system.
+### Registry Capabilities Schema (`registry.yaml` / `registry.json`)
 
-### C. Exact Source Artifact (`@ECC/git-commit` or `@awesome-claude-skills/pdf-analyzer`)
-- **Behavior**: Resolves the single, exact `SKILL.md` or agent manifest within that namespace, searching through nested directories if required.
-
-### D. Custom Skill (`@custom/my-skill` or `@custom/db-migration`)
-- **Behavior**: Resolves exclusively from `my-custom-skills/skills/my-skill/SKILL.md`.
-
-### E. MCP & Tooling Namespaces (`@mcp/github`, `@mcp/claude-code`, `@tool/claude-context`)
-- **Behavior**: Routes to MCP configuration updates or CLI helper tool invocation.
-
----
-
-## 8. Global Installation Architecture
-
-To enable access from **any directory** (`cd ~/projects/app`) without copying files into every repository:
-
-```text
-Host System Environment
-├── ~/.claude-toolkit/               <-- Symlink or config pointing to monorepo location
-│   ├── registry.json                <-- Generated namespace manifest with nested skill index
-│   └── bin/ctk-resolve              <-- Lightweight CLI resolver binary
-├── ~/.gemini/config/skills/         <-- Global discovery symlinks for Gemini/Antigravity
-│   └── ctk/                         <-- Managed namespace links
-├── ~/.claude/skills/                <-- Global discovery symlinks for Claude Code CLI
-└── /usr/local/bin/ctk               <-- Global CLI wrapper (optional)
+```json
+{
+  "version": "1.0.0",
+  "updated_at": "2026-10-06T15:38:00Z",
+  "sources": {
+    "ECC": {
+      "path": "ECC",
+      "category": "harness-os",
+      "capabilities": ["harness-os", "skill-library", "cli-tool"],
+      "entry_point": "ECC/install.sh",
+      "native_cli": "ecc-universal",
+      "supports_exact_resolution": true
+    },
+    "superpowers": {
+      "path": "superpowers",
+      "category": "workflow-engine",
+      "capabilities": ["workflow-engine", "skill-library"],
+      "entry_point": "superpowers/index.js",
+      "supports_exact_resolution": true
+    },
+    "awesome-claude-skills": {
+      "path": "awesome-claude-skills",
+      "category": "skill-library",
+      "capabilities": ["skill-library"],
+      "search_depth": 2,
+      "supports_exact_resolution": true
+    },
+    "claude-code-mcp": {
+      "path": "claude-code-mcp",
+      "category": "mcp-server",
+      "capabilities": ["mcp-server"],
+      "mcp_command": "node",
+      "mcp_args": ["claude-code-mcp/build/index.js"],
+      "supports_exact_resolution": false
+    },
+    "claude-context": {
+      "path": "claude-context",
+      "category": "cli-tool",
+      "capabilities": ["cli-tool"],
+      "exec_command": "npx claude-context",
+      "supports_exact_resolution": false
+    },
+    "github-mcp-server": {
+      "path": "github-mcp-server",
+      "category": "mcp-server",
+      "capabilities": ["mcp-server"],
+      "mcp_command": "github-mcp-server",
+      "supports_exact_resolution": false
+    },
+    "custom": {
+      "path": "my-custom-skills",
+      "category": "skill-library",
+      "capabilities": ["skill-library"],
+      "supports_exact_resolution": true
+    },
+    "workspace-rules": {
+      "path": "maniadav-agent-workspace",
+      "category": "reference-rules",
+      "capabilities": ["reference-rules"],
+      "supports_exact_resolution": true
+    }
+  }
+}
 ```
 
 ---
 
-## 9. Coding Agent Integration & Portability
+## 6. Namespace Model & Canonical Addressing
 
-| Coding Agent | Integration Level | Resolution Method | Adapter Mechanism |
-|---|---|---|---|
-| **Claude Code CLI** | Native / Direct | Prompt `@` reference or global skill path | `~/.claude/skills/` symlink & CLI pipe |
-| **Antigravity IDE / AGY** | Native / Direct | Prompt `@` reference or `.agents/` | `~/.gemini/config/skills/` & `.agents/` resolver |
-| **Cursor IDE** | Adapter Required | `@` symbol reference or `.cursor/rules/` | Generated `.cursor/rules/ctk-namespaces.mdc` |
-| **Codex** | Adapter Required | System prompt injection | Generated `.codex/` workspace rules |
-| **OpenCode / Vibe** | Adapter Required | Plugin manifest link | Shared `.agents/` discovery adapter |
-| **GitHub Copilot** | Wrapper Required | Workspace instruction reference | Generated `.github/copilot-instructions.md` link |
+The canonical CTK namespace maps directly to source aliases:
 
----
-
-## 10. Security and Isolation
-
-1. **Zero Implicit Execution**: No code or prompt is evaluated without explicit user `@namespace` invocation.
-2. **Credential Safety**: No secrets or API keys are stored in registry files. All MCP servers consume environment variables (`ANTHROPIC_API_KEY`, `GITHUB_TOKEN`).
-3. **Execution Sandboxing**: Harness shell commands (`ECC`) operate under host execution permissions or standard IDE sandbox boundaries.
-4. **Upstream Isolation**: Submodules remain untouched read-only Git references.
+```text
+@ECC                           -> Activates ECC native harness OS
+@ECC/<artifact>                -> Resolves exact ECC skill/agent
+@superpowers                   -> Activates superpowers TDD workflow engine
+@superpowers/<skill>           -> Resolves exact superpower skill
+@awesome-claude-skills/<skill> -> Resolves exact Composio skill across 2-level categories
+@claude-skills/<skill>         -> Resolves exact enterprise skill
+@custom/<skill>                -> Resolves user custom skill from my-custom-skills/skills/
+@mcp/github                    -> Registers/invokes GitHub MCP server
+@mcp/claude-code               -> Registers/invokes Claude CLI MCP bridge
+@tool/claude-context           -> Invokes AST context parser CLI
+@workspace-rules               -> Injects maniadav-agent-workspace engineering standards
+```
 
 ---
 
-## 11. Submodule Update Strategy
+## 7. Exact Artifact Resolution Semantics
 
-Submodule updating remains independent and non-destructive:
+When resolving `@source/artifact`:
 
-1. User runs `npm run update` or `bash scripts/update-all.sh`.
-2. Git pulls upstream updates for all 13 submodules.
-3. Post-update hook runs `ctk-reindex` to refresh `~/.claude-toolkit/registry.json` and deep skill indexes.
-4. `my-custom-skills/` and local configurations remain 100% untouched.
+```text
+                                  User inputs `@source/artifact`
+                                                │
+                                                ▼
+                                    Source registered in CTK?
+                                      /                   \
+                                    NO                     YES
+                                    /                       \
+                          Return ERROR:                  Type-Aware
+                         Unknown Source              Capability Check
+                                                            │
+                                                            ▼
+                                                Supports Exact Resolution?
+                                                  /                    \
+                                                NO                      YES
+                                                /                        \
+                                     Return ERROR:                     Index Search
+                                    Type does not support           for target artifact
+                                    artifact extraction                      │
+                                                                             ▼
+                                                                  Match Count Evaluated
+                                                                /          |          \
+                                                               0           1          >1
+                                                              /            |            \
+                                                      Return ERROR:     SUCCESS:    Return ERROR:
+                                                     Artifact Not Found  Resolve    Ambiguity Error
+                                                                        Artifact    List Candidates
+```
+
+### Exact Resolution Code Logic Specification
+1. **0 Matches**: Returns `ERROR: Artifact '<artifact>' not found in namespace '@<source>'`.
+2. **1 Match**: Resolves canonical file path deterministically.
+3. **>1 Matches**: Returns `ERROR: Ambiguous artifact reference '@<source>/<artifact>'`. Lists all candidate matching paths (e.g. `awesome-claude-skills/document-skills/pdf/SKILL.md` vs `awesome-claude-skills/other-skills/pdf/SKILL.md`) and demands explicit category specifying.
+
+---
+
+## 8. Type-Aware Native Delegation Model
+
+When a user invokes a namespace, CTK delegates execution to the source's native mechanism based on its type:
+
+```text
++-------------------+--------------------------------------------------------------------------------+
+| Executable Type   | Native Delegation Action                                                      |
++-------------------+--------------------------------------------------------------------------------+
+| skill-library     | Formats SKILL.md payload for agent loader (.claude/skills/ or .agents/skills/) |
+| harness-os        | Executes entry_point script (ECC install.sh/ecc-universal) and attaches shims   |
+| workflow-engine   | Activates workflow framework (superpowers index.js) and loads spec plugins     |
+| mcp-server        | Updates ~/.gemini/config/mcp_config.json or .mcp.json server entry             |
+| cli-tool          | Outputs shell invocation command (npx claude-context .)                        |
+| ci-runner         | Generates .github/workflows/ template for CI pipeline                          |
+| reference-rules   | Symlinks system rules (AGENTS.md / .cursorrules / copilot-instructions.md)     |
++-------------------+--------------------------------------------------------------------------------+
+```
+
+---
+
+## 9. Global Installation Architecture
+
+Global access from any folder (`cd ~/Projects/my-app`) is achieved without root privileges via user-space binaries and configuration paths:
+
+```text
+Host System Environment ($HOME)
+├── .local/
+│   └── bin/
+│       └── ctk                        <-- Global CLI wrapper script (added to $PATH)
+├── .config/
+│   └── ctk/
+│       ├── registry.json              <-- Generated host registry index
+│       └── config.json                <-- Global CTK user settings (pointing to monorepo root)
+├── .claude/
+│   └── skills/
+│       └── ctk -> ~/.config/ctk/links <-- Symlinked skill adapter for Claude Code CLI
+└── .gemini/
+    └── config/
+        └── skills/
+            └── ctk -> ~/.config/ctk/  <-- Symlinked skill adapter for Antigravity IDE / AGY
+```
+
+### Setup Execution Flow (`./install.sh`)
+1. Detects absolute path of `claude-code-toolkit`.
+2. Verifies Node.js (>= 18), Python (>= 3.10), Git (>= 2.30).
+3. Scans all submodules and generates `~/.config/ctk/registry.json`.
+4. Creates executable wrapper script `~/.local/bin/ctk`.
+5. Prompts user to append `export PATH="$HOME/.local/bin:$PATH"` if not present.
+6. Establishes native symlink adapters for Claude Code, Antigravity, and Cursor.
+
+---
+
+## 10. Canonical CTK Interface (CLI / API)
+
+The core `ctk` utility provides a clean, agent-agnostic CLI interface:
+
+```bash
+# General Information & Diagnostics
+ctk list                             # Lists all registered sources, categories, and capabilities
+ctk inspect @ECC                     # Displays metadata, path, and capabilities for @ECC
+ctk doctor                          # Validates submodule states, symlinks, and PATH setup
+
+# Artifact Resolution & Path Querying
+ctk resolve @ECC/git-commit          # Resolves exact path to ECC's git-commit skill
+ctk resolve @custom/db-migration     # Resolves exact path to user custom skill
+ctk path @superpowers                # Prints absolute filesystem path to superpowers submodule
+
+# Activation & Delegation
+ctk activate @ECC                    # Activates ECC native harness environment
+ctk activate @superpowers            # Activates superpowers TDD workflow engine
+
+# System Maintenance
+ctk update                           # Pulls git submodules and refreshes registry index
+ctk install                          # Performs global host setup
+ctk uninstall                        # Cleanly removes global binaries, symlinks, and registries
+```
+
+---
+
+## 11. Agent Integration Architecture & Compatibility Matrix
+
+Different coding agents possess different native mechanisms for rule discovery and tool execution:
+
+```text
+                       Canonical CTK Core (`ctk`)
+                                   │
+         ┌─────────────────────────┼─────────────────────────┐
+         ▼                         ▼                         ▼
+Claude Code Adapter       Antigravity Adapter         Cursor Adapter
+ (~/.claude/skills/)      (~/.gemini/config/)        (.cursor/rules/)
+         │                         │                         │
+         ▼                         ▼                         ▼
+Claude Code CLI           Antigravity IDE / AGY         Cursor IDE
+ Native Invocation         Native Invocation         Native Invocation
+```
+
+| Coding Agent | Integration Level | `@` Syntax Support | Native Skill Loading | MCP Support | CTK Adapter Strategy |
+|---|---|---|---|---|---|
+| **Claude Code CLI** | Verified Native | Native via prompt / `/` | `.claude/skills/` | Native stdio/SSE | Symlink `~/.claude/skills/ctk` to `~/.config/ctk/links` |
+| **Antigravity IDE / AGY**| Verified Native | Native via prompt / `@` | `.agents/skills/` | Native stdio/SSE | Symlink `~/.gemini/config/skills/ctk` to registry |
+| **Cursor IDE** | Adapter Required | Native via `@` file attach | `.cursor/rules/*.mdc` | Native stdio/SSE | Generate `.cursor/rules/ctk-namespaces.mdc` |
+| **Codex** | Adapter Required | System prompt reference | `.codex/skills/` | Adapter required | Generate `.codex/skills/` proxy links |
+| **OpenCode / Vibe** | Adapter Required | Plugin manifest link | `.agents/skills/` | Native stdio/SSE | Shared `.agents/` adapter link |
+| **GitHub Copilot** | Wrapper Required | Workspace prompt ref | Passive instructions | Unsupported | Generate `.github/copilot-instructions.md` links |
 
 ---
 
 ## 12. Custom Skills Integration (`my-custom-skills/`)
 
-- Located at `my-custom-skills/skills/<skill-name>/SKILL.md`.
-- Mapped to `@custom/<skill-name>`.
-- Fully owned by the user, tracked in `claude-code-toolkit` git history, and excluded from submodule clean/reset operations.
+- Directory: `my-custom-skills/skills/<skill-name>/SKILL.md`.
+- Namespace: `@custom/<skill-name>`.
+- Ownership: **100% User-Owned**.
+- Version Control: Tracked directly in `claude-code-toolkit` git repository.
+- Protection: Explicitly excluded from `git submodule clean` or `git submodule update` operations. Updating external submodules will **never** alter or overwrite custom skills.
 
 ---
 
-## 13. Proposed Directory Structure
+## 13. `maniadav-agent-workspace` Integration
+
+- Directory: `maniadav-agent-workspace/`.
+- Namespace: `@workspace-rules` or `@maniadav`.
+- Primary Role: Reference implementation for cross-agent engineering standards.
+- Adapter Action:
+  - Antigravity IDE $\rightarrow$ Symlinks `maniadav-agent-workspace/antigravity/` rules to `.agents/rules/`.
+  - Cursor IDE $\rightarrow$ Symlinks `maniadav-agent-workspace/cursor/` rules to `.cursor/rules/`.
+  - GitHub Copilot $\rightarrow$ Symlinks `maniadav-agent-workspace/copilot/` instructions to `.github/copilot-instructions.md`.
+
+---
+
+## 14. Security and Isolation Guarantees
+
+1. **Zero Implicit Context Pollution**: Without explicit `@source` invocation, 0 submodules are loaded.
+2. **Deterministic Resolution**: Ambiguous matches throw explicit errors rather than guessing.
+3. **Credential Safeguards**: Secrets are never written to `registry.json`. All MCP servers read runtime environment variables (`ANTHROPIC_API_KEY`, `GITHUB_TOKEN`).
+4. **Execution Boundaries**: Harness commands (`ECC`) execute under host OS permissions or IDE sandbox restrictions.
+5. **Read-Only Submodule Safety**: Third-party submodules are treated as read-only Git dependencies.
+
+---
+
+## 15. Maintenance, Install, and Uninstall Strategy
+
+### Submodule Updates (`ctk update`)
+Running `ctk update` (or `npm run update`):
+1. Executes `git submodule update --init --recursive --remote --merge`.
+2. Triggers `ctk reindex` to re-scan submodule paths and update `~/.config/ctk/registry.json`.
+3. Preserves `my-custom-skills/` without modification.
+
+### Clean Uninstallation (`./uninstall.sh` or `ctk uninstall`)
+1. Removes wrapper binary `~/.local/bin/ctk`.
+2. Removes global config directory `~/.config/ctk/`.
+3. Removes global symlink adapters from `~/.claude/skills/ctk` and `~/.gemini/config/skills/ctk`.
+4. Leaves host system completely clean without broken symlinks.
+
+---
+
+## 16. Failure Semantics & Error Messages
+
+```text
++-------------------------------+-----------------------------------------------------------------------------------+
+| Failure Scenario              | Explicit Error Output                                                             |
++-------------------------------+-----------------------------------------------------------------------------------+
+| Unknown Namespace             | ERROR: Namespace '@unknown' is not registered.                                    |
+|                               | Run 'ctk list' to view available namespaces.                                      |
++-------------------------------+-----------------------------------------------------------------------------------+
+| Missing Artifact              | ERROR: Artifact 'foo' not found in namespace '@ECC'.                              |
+|                               | Run 'ctk inspect @ECC' to view available artifacts.                               |
++-------------------------------+-----------------------------------------------------------------------------------+
+| Ambiguous Artifact Match      | ERROR: Ambiguous artifact reference '@awesome-claude-skills/pdf'.                 |
+|                               | Multiple candidates found:                                                        |
+|                               |   1. awesome-claude-skills/document-skills/pdf/SKILL.md                            |
+|                               |   2. awesome-claude-skills/other-skills/pdf/SKILL.md                               |
+|                               | Specify exact category path: @awesome-claude-skills/document-skills/pdf           |
++-------------------------------+-----------------------------------------------------------------------------------+
+| Capability Unsupported        | ERROR: Namespace '@github-mcp-server' is an MCP Server, not a skill library.      |
+|                               | Run 'ctk activate @github-mcp-server' to register it in mcp_config.json.          |
++-------------------------------+-----------------------------------------------------------------------------------+
+```
+
+---
+
+## 17. Proposed Directory Structure
 
 ```text
 claude-code-toolkit/
-├── .gitmodules
-├── package.json
-├── README.md
-├── PLAN-unified-agent-skill-system.md     <-- THIS DOCUMENT
+├── .gitmodules                      # Submodule configurations
+├── package.json                     # Monorepo update scripts
+├── README.md                        # Primary documentation & capability matrix
+├── PLAN-unified-agent-skill-system.md     # THIS FINAL PLAN DOCUMENT
+├── install.sh                       # Global user-space installer script
+├── uninstall.sh                     # Global clean teardown script
 ├── scripts/
-│   ├── update-all.sh
-│   └── install-global.sh                   <-- Proposed Global Installer
-├── resolver/                                <-- Proposed Resolver Core (Future Phase)
-│   ├── registry.json.template
-│   ├── ctk-resolver.js
-│   └── adapters/
-│       ├── claude-adapter.js
-│       ├── cursor-adapter.js
-│       └── antigravity-adapter.js
-├── my-custom-skills/                        <-- Personal Custom Skills
+│   ├── update-all.sh                # Submodule updater script
+│   └── ctk-cli.js                   # Executable entry point for ctk CLI
+├── ctk/                             # Core CTK Engine (Future Implementation Phase)
+│   ├── registry.js                  # Registry generator & validator
+│   ├── resolver.js                  # Scoped namespace & exact artifact resolver
+│   ├── adapters/
+│   │   ├── claude.js                # Claude Code CLI adapter
+│   │   ├── antigravity.js           # Antigravity IDE / AGY adapter
+│   │   ├── cursor.js                # Cursor MDC rules adapter
+│   │   └── mcp.js                   # MCP server config generator
+│   └── templates/
+│       ├── registry.json.template
+│       └── ctk-wrapper.sh
+├── my-custom-skills/                # Personal Custom Skills
 │   ├── README.md
 │   ├── scripts/
 │   └── skills/
-│       └── example-custom-skill/
+│       └── example-skill/
 │           └── SKILL.md
-├── Ay-Skills/                               <-- Submodule 1
-├── ECC/                                     <-- Submodule 2
-├── awesome-claude-code/                     <-- Submodule 3
-├── awesome-claude-code-toolkit/             <-- Submodule 4
-├── awesome-claude-skills/                   <-- Submodule 5
-├── claude-code-action/                      <-- Submodule 6
-├── claude-code-best-practice/               <-- Submodule 7
-├── claude-code-mcp/                         <-- Submodule 8 (MCP Bridge)
-├── claude-code-ultimate-guide/              <-- Submodule 9
-├── claude-context/                          <-- Submodule 10 (AST CLI)
-├── claude-skills/                           <-- Submodule 11
-├── github-mcp-server/                       <-- Submodule 12 (Go MCP Server)
-├── superpowers/                             <-- Submodule 13
-└── maniadav-agent-workspace/                <-- Reference Workspace
+├── Ay-Skills/                       # Submodule 1
+├── ECC/                             # Submodule 2
+├── awesome-claude-code/             # Submodule 3
+├── awesome-claude-code-toolkit/     # Submodule 4
+├── awesome-claude-skills/           # Submodule 5
+├── claude-code-action/              # Submodule 6
+├── claude-code-best-practice/       # Submodule 7
+├── claude-code-mcp/                 # Submodule 8
+├── claude-code-ultimate-guide/      # Submodule 9
+├── claude-context/                  # Submodule 10
+├── claude-skills/                   # Submodule 11
+├── github-mcp-server/               # Submodule 12
+├── superpowers/                     # Submodule 13
+└── maniadav-agent-workspace/        # Reference Workspace
 ```
 
 ---
 
-## 14. Installation UX
+## 18. Architectural Self-Assessment & Challenge
 
-```bash
-# Step 1: Navigate to toolkit directory
-cd /Users/manishyadav/Documents/code/maniadav/claude-code-toolkit
+Before proposing implementation, we critically evaluated the architecture against 10 core questions:
 
-# Step 2: Run global installation (Planning phase - NOT executed yet)
-./scripts/install-global.sh
-
-# Output:
-# [CTK] Registering 13 submodules...
-# [CTK] Indexing deep nested skills (awesome-claude-skills, claude-skills)...
-# [CTK] Categorizing skill libraries, harness engines, MCP bridges, and AST tools...
-# [CTK] Registering custom namespace (@custom) and rules (@workspace-rules)...
-# [CTK] Generating global registry at ~/.claude-toolkit/registry.json...
-# [CTK] Setting up adapters for Claude Code, Antigravity, and Cursor...
-# ✅ Installation complete! You can now use @ECC, @superpowers, @custom in any project.
-```
+1. **Is a centralized resolver actually necessary?**  
+   *Yes*. Without a resolver, deep 2-level skill folders in `awesome-claude-skills` and non-prompt submodules like `claude-code-mcp` fail or inject raw binary/config data into model prompts.
+2. **Can the requirement be achieved more simply with global symlinks alone?**  
+   *No*. Global symlinks flatly dump all 2,000+ `SKILL.md` files into agent memory simultaneously, violating the **No Global Semantic Discovery** rule and causing massive token bloat and skill collisions.
+3. **Which parts genuinely require code?**  
+   Only the lightweight CLI resolver (`ctk-cli.js`) and path index generator (`registry.js`).
+4. **Which parts should remain native to each submodule?**  
+   All execution, subagent spawning, TDD workflow logic, and shims remain 100% inside their respective submodules.
+5. **Is a registry necessary?**  
+   *Yes*, a lightweight generated capability manifest (`registry.json`) is required to map aliases (`@ECC`, `@superpowers`, `@custom`) to absolute paths.
+6. **Should the registry be static or generated?**  
+   *Generated on setup/update*. Static registries break when submodule paths change or new skills are added upstream.
+7. **Should exact artifact indexing exist?**  
+   *Yes*, a lightweight lookup map of unique skill basenames avoids runtime filesystem searching.
+8. **Can `@` namespace actually be supported across target agents?**  
+   *Yes*. Claude Code, Antigravity, and Cursor natively support `@` file/folder references. For agents without native `@` interception, `ctk resolve @source/artifact` provides the fallback.
+9. **What is the smallest architecture that satisfies the requirements?**  
+   A single Node.js script (`ctk-cli.js`) operating on `~/.config/ctk/registry.json` without external npm runtime dependencies.
+10. **What functionality should explicitly NOT be built?**  
+    We explicitly reject building AI skill recommendation engines, automatic prompt merging, or custom skill schema parsers.
 
 ---
 
-## 15. Example User Flows
+## 19. System Architecture Flowchart
 
-### Scenario 1: Executing TDD Workflow in any arbitrary project
-```bash
-cd ~/Projects/ecommerce-api
-# Inside Cursor, Claude Code, or Antigravity prompt:
-"Use @superpowers to design and implement the payment gateway with strict TDD."
-```
--> *Resolver activates `superpowers` namespace and loads its TDD workflow spec.*
-
-### Scenario 2: Invoking exact custom skill
-```bash
-cd ~/Projects/mobile-app
-# Inside prompt:
-"Use @custom/db-migration to generate a new Prisma schema migration."
-```
--> *Resolver resolves `my-custom-skills/skills/db-migration/SKILL.md` directly.*
-
-### Scenario 3: Targeted nested submodule artifact resolution
-```bash
-cd ~/Projects/web-frontend
-# Inside prompt:
-"Use @awesome-claude-skills/pdf-analyzer to extract text from user upload."
-```
--> *Resolver searches 2-level nested paths and extracts `awesome-claude-skills/document-skills/pdf-analyzer/SKILL.md` directly.*
-
-### Scenario 4: Using Claude Code via MCP Server Bridge in Cursor/Codex
 ```text
-Inside Cursor or Codex:
-"Use @mcp/claude-code to run a complex refactoring job using Claude Code CLI."
+                        ANY WORKING DIRECTORY (`~/Projects/app`)
+                                           │
+                                           ▼
+                                 User Prompt Injected
+                                           │
+                        Contains Explicit Scoped Source?
+                         /                            \
+                       NO                              YES
+                       /                                \
+             No Action Taken                     CTK Resolver Invoked
+            (0 Submodules Loaded)                (`ctk resolve @source`)
+            Normal Agent Behavior                        │
+                                                         ▼
+                                             Registry Capability Check
+                                             (`~/.config/ctk/registry.json`)
+                                                         │
+         ┌─────────────────────────┬─────────────────────┴───────────────────┬─────────────────────────┐
+         ▼                         ▼                                         ▼                         ▼
+   `skill-library`           `harness-os`                             `mcp-server`               `cli-tool`
+         │                         │                                         │                         │
+         ▼                         ▼                                         ▼                         ▼
+Format SKILL.md for       Execute native entry                   Register server in         Output shell command
+Target Agent Loader       script (install.sh)                    mcp_config.json            (npx claude-context .)
 ```
--> *Resolver configures `claude-code-mcp` Node.js server to expose the `claude_code` tool.*
 
 ---
 
-## 16. Implementation Phases (Proposed for Execution After Approval)
+## 20. Phased Implementation Roadmap
 
-- **Phase 1 (Current)**: Architecture & Submodule Investigation (`PLAN-unified-agent-skill-system.md`).
-- **Phase 2**: Resolver Core Implementation (`resolver/ctk-resolver.js` & `registry.json`).
-- **Phase 3**: Agent Adapters (Claude Code, Antigravity, Cursor rule generators).
-- **Phase 4**: Global Installer Script (`scripts/install-global.sh`).
-- **Phase 5**: Verification & Cross-Agent Testing.
+Once approved, implementation will proceed in 5 isolated, testable phases:
 
----
-
-## 17. Verification & Test Plan
-
-Before declaring implementation complete (in future phase), we will verify:
-1. **Zero-Discovery Isolation Test**: Running `"Implement feature X"` loads 0 submodules and 0 skills.
-2. **Explicit Namespace Resolution Test**: `@ECC` loads ECC native discovery; `@superpowers` loads superpowers TDD engine.
-3. **Exact Artifact Resolution Test**: `@ECC/git-commit` resolves only that skill.
-4. **Nested Skill Path Resolution Test**: `@awesome-claude-skills/pdf-analyzer` finds skill inside 2-level directory structure.
-5. **Custom Skill Isolation Test**: `@custom/my-skill` loads from `my-custom-skills/` without touching submodules.
-6. **MCP Server Route Test**: `@mcp/claude-code` and `@mcp/github` route to MCP configurations, not prompt injection.
-7. **Cross-Project Test**: `cd ~/test-project` and invoking `@superpowers` works seamlessly without copying files.
-8. **Submodule Update Integrity Test**: Running `npm run update` updates all submodules without breaking namespace registry mappings.
+- **Phase 1: Foundation**: Create `ctk/registry.js` generator and initial `~/.config/ctk/registry.json` schema.
+- **Phase 2: CLI Core**: Implement `ctk-cli.js` with `list`, `inspect`, `resolve`, and `path` commands.
+- **Phase 3: Type Adapters**: Implement skill loaders, MCP config generators, and workspace rules symlinkers.
+- **Phase 4: Installer & Teardown**: Build `./install.sh` and `./uninstall.sh`.
+- **Phase 5: E2E Verification**: Execute complete empirical verification test suite across Claude Code, Antigravity, and Cursor.
 
 ---
 
-## 18. Approval Required
+## 21. Decision Table
+
+| Decision Item | Recommendation | Empirical Evidence | Approval Required |
+|---|---|---|---|
+| **Global Installation Model** | User-space binaries (`~/.local/bin/ctk`) and global config (`~/.config/ctk/`) | Avoids `/usr/local/bin` root privileges, fully compatible with macOS zsh | Required |
+| **Namespace Syntax** | `@<source>` and `@<source>/<artifact>` (e.g. `@ECC`, `@superpowers`, `@custom/db-migration`) | Matches native UI auto-complete in Cursor, Antigravity, and Claude Code | Required |
+| **Canonical CLI Core** | Lightweight Node.js CLI script (`scripts/ctk-cli.js`) | Node.js (>= 18) is a verified prerequisite; avoids extra compilation steps | Required |
+| **Registry Schema** | Generated JSON capability manifest (`~/.config/ctk/registry.json`) | Re-indexed on `ctk update`; handles 2-level nested skills in `awesome-claude-skills` | Required |
+| **Exact Resolution Model** | Deterministic matching with explicit error on ambiguity (>1 matches) | Eliminates unsafe fuzzy matching and instruction bleed | Required |
+| **Agent Adapters Target** | **Claude Code CLI**, **Antigravity IDE / AGY**, **Cursor IDE** | Verified native support for `@` file references and custom skill loaders | Required |
+| **MCP Handling** | Route `@mcp/<server>` to `mcp_config.json` / `.mcp.json` registration | Prevents injecting raw MCP binary code into LLM context windows | Required |
+| **Multi-Source Composition** | Single active source default in v1 (no implicit `@source1 + @source2`) | Prevents conflicting workflow philosophies (e.g. TDD vs non-TDD) | Required |
+
+---
+
+## 22. Approval Required
 
 > [!IMPORTANT]
 > **Implementation has NOT been performed.**
 >
-> The following design decisions require explicit user confirmation before code implementation begins:
+> The following decision items require your explicit confirmation before implementation begins:
 >
-> 1. **Namespace Prefix Syntax**: Confirm preference for `@<namespace>` and `@<namespace>/<artifact>` notation (e.g., `@ECC`, `@superpowers`, `@custom/my-skill`, `@mcp/claude-code`).
-> 2. **Global Registry Location**: Confirm storing host global registry config at `~/.claude-toolkit/registry.json`.
-> 3. **Supported Coding Agents**: Confirm initial adapter targets: **Claude Code CLI**, **Antigravity IDE / AGY**, and **Cursor IDE**.
+> 1. **User-Space Global Installation**: Approve installing global CLI to `~/.local/bin/ctk` and global config to `~/.config/ctk/registry.json`.
+> 2. **Namespace & Exact Addressing Syntax**: Approve `@<source>` and `@<source>/<artifact>` addressing conventions.
+> 3. **Single Active Source Policy (v1)**: Approve strictly enforcing one active source at a time to prevent workflow collisions.
+> 4. **Initial Agent Adapter Scope**: Approve initial target adapters for **Claude Code CLI**, **Antigravity IDE / AGY**, and **Cursor IDE**.
 >
-> Once approved, implementation can proceed according to the phases outlined above.
+> Once approved, implementation will execute according to the 5-phase roadmap.
