@@ -1,6 +1,6 @@
-# Claude Skills & Agent Harness Workspace
+# Claude Code Toolkit
 
-A production-grade monorepo and ecosystem hub containing modular Claude Code skills, Model Context Protocol (MCP) servers, agent harnesses, workflow engines, context optimization utilities, and CI/CD GitHub Action runners. Built for software engineers and AI system maintainers, this repository provides battle-tested tools to automate development workflows, manage context windows efficiently, enforce security boundaries, and orchestrate subagent pipelines.
+Comprehensive monorepo bringing together 13 production-grade open-source Claude Code toolkits, agent harnesses, Model Context Protocol (MCP) servers, workflow engines, and enterprise skill suites. Designed for developers and AI engineers operating Claude Code CLI, Antigravity IDE, Cursor, and AGY agents.
 
 ---
 
@@ -8,19 +8,20 @@ A production-grade monorepo and ecosystem hub containing modular Claude Code ski
 
 - [Project Overview](#project-overview)
 - [Key Features](#key-features)
-- [Architecture / System Design](#architecture--system-design)
+- [System Architecture](#system-architecture)
 - [Repository Structure](#repository-structure)
 - [Technology Stack](#technology-stack)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
 - [Configuration](#configuration)
-- [Running the Project](#running-the-project)
+- [Skill Activation Protocol](#skill-activation-protocol)
+- [Operational Rules & What NOT to Do](#operational-rules--what-not-to-do)
 - [Usage Examples](#usage-examples)
-- [Development Workflow](#development-workflow)
-- [Docker](#docker)
-- [CI/CD](#cicd)
+- [Submodule Maintenance & Updates](#submodule-maintenance--updates)
+- [Docker & MCP Deployment](#docker--mcp-deployment)
+- [CI/CD Integration](#cicd-integration)
 - [Troubleshooting](#troubleshooting)
-- [Performance Notes](#performance-notes)
+- [Performance & Token Economy](#performance--token-economy)
 - [Security Considerations](#security-considerations)
 - [Limitations](#limitations)
 - [License](#license)
@@ -29,184 +30,130 @@ A production-grade monorepo and ecosystem hub containing modular Claude Code ski
 
 ## Project Overview
 
+The **Claude Code Toolkit** is a centralized engineering workspace created to organize, manage, and execute top-tier Claude Code agent resources. Instead of managing fragmented repositories, this monorepo attaches 13 open-source toolkits as version-controlled Git submodules while maintaining an isolated workspace for personal custom skills.
+
 ### Purpose
-The Claude Skills & Agent Harness Workspace serves as an integrated developer platform for configuring, extending, and operating autonomous coding agents powered by Claude Code and the Model Context Protocol (MCP). It consolidates disparate skills, harness runtimes, context management tools, and GitHub workflows into a unified, version-controlled environment.
-
-### Main Capabilities
-- **Modular Skill Execution**: Inject pre-built instructions and runbooks into agent sessions for specialized tasks such as UI/UX design, SEO auditing, video synthesis, and diagram generation.
-- **Agent Harness Runtime (`ECC`)**: Operating-system-level harness controls for managing agent lifecycles, hook profiles, workspace safety, and command execution limits.
-- **Agentic Workflow Engine (`superpowers`)**: Structured development pipelines enforcing iterative phases (Brainstorming → Spec Creation → Execution Plan → Subagent Execution → TDD & Code Review).
-- **Context Packing & AST Generation (`claude-context`)**: Tools to compress codebases into token-efficient context prompts, dependency maps, and structural summaries.
-- **Model Context Protocol (MCP) Integration**: Production-ready MCP client interfaces and official GitHub server implementations to connect agents to external services.
-- **CI/CD Action Automation (`claude-code-action`)**: Native GitHub Actions workflows for automated PR reviews, security auditing, and issue triaging.
-
-### Intended Users
-- Senior software engineers and AI platform developers building autonomous workflow agents.
-- Open-source maintainers seeking standardized PR review and issue management pipelines.
-- Engineering teams incorporating AI-driven test-driven development (TDD) and architectural planning into daily software development.
-
-### Typical Use Cases
-- Auto-generating production code through multi-agent delegation with mandatory unit test verification.
-- Auditing repository security, technical SEO, and code quality directly inside CLI agent sessions.
-- Exposing GitHub APIs, web browsers, and database engines to Claude Code via strict MCP interface boundaries.
-- Automating repository triage and continuous integration code reviews using headless runner workflows.
+- **Unified Skill Management**: Consolidate enterprise skill libraries, TDD workflow drivers, and design system generators in a single repository.
+- **Upstream Synchronization**: Keep external skill suites up-to-date with one command without losing local modifications.
+- **Extensibility**: Provide a designated, non-destructive space (`my-custom-skills/`) for custom agent skills and scripts.
 
 ---
 
 ## Key Features
 
-- **Progressive Skill Loading**: Automatically exposes skill capabilities without cluttering context windows until explicitly activated.
-- **Autonomous Subagent Orchestration**: Spawns isolated, task-focused subagents to execute complex engineering tasks concurrently.
-- **Test-Driven Development (TDD) Enforcement**: Mandates failing test creation prior to feature implementation and verifies clean passing runs before completion.
-- **Security & Safety Shielding (`ecc-agentshield`)**: Validates terminal commands, inspects parameter boundaries, and blocks dangerous system mutations.
-- **High-Density Context Packing**: Generates token-optimized repository structural maps and AST abstractions for LLM ingestion.
-- **Cross-Platform CLI Interfaces**: Provides unified CLI binaries (`ecc-universal`, `agent-browser`, `claude-context`) compatible with macOS, Linux, and Windows.
+- **Auto-Discovery Compatible**: Follows native standard skill directory conventions (`.claude/skills/`, `.agents/skills/`, and `~/.gemini/config/skills/`).
+- **13 Managed Submodules**: Includes industry-standard skill registries, harness engines (`ECC`), context indexers (`claude-context`), TDD frameworks (`superpowers`), and official MCP servers.
+- **Single-Command Upgrades**: Includes automated update tooling (`npm run update` or `bash scripts/update-all.sh`) to synchronize all submodules recursively.
+- **Isolated Custom Skill Space**: Dedicated `my-custom-skills/` folder untouched by external git submodule pulls.
+- **MCP Server Launchers**: Ready-to-use configurations for running GitHub and general MCP servers.
 
 ---
 
-## Architecture / System Design
+## System Architecture
 
 ```text
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           Developer / CI Runner                             │
-└──────────────────────────────────────┬──────────────────────────────────────┘
-                                       │
-                                       ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                     Claude Code CLI Runtime (Agent Host)                     │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  ┌───────────────────────┐ ┌───────────────────────┐ ┌───────────────────┐  │
-│  │     Agent Harness     │ │    Workflow Engine    │ │  Context Packer   │  │
-│  │   (`ECC-main` / CLI)   │ │  (`superpowers-main`) │ │ (`claude-context`)│  │
-│  └───────────┬───────────┘ └───────────┬───────────┘ └─────────┬─────────┘  │
-└──────────────┼─────────────────────────┼───────────────────────┼────────────┘
-               │                         │                       │
-               ▼                         ▼                       ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                       Skill & Rule Resolution Layer                         │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  • Ay-Skills-main              • awesome-claude-skills-master               │
-│  • claude-skills-main          • claude-code-best-practice-main             │
-└────────────────────────────────────────┬────────────────────────────────────┘
-                                         │
-                                         ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                       Model Context Protocol (MCP)                          │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  • `github-mcp-server-main`    • `claude-code-mcp-main`                     │
-│  • Browser / Database Tools    • Custom API Connectors                      │
-└────────────────────────────────────────┬────────────────────────────────────┘
-                                         │
-                                         ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                      Target Workspace & Infrastructure                      │
-│                  (Source Code, Git Repositories, APIs)                      │
-└─────────────────────────────────────────────────────────────────────────────┘
++-----------------------------------------------------------------------------------+
+|                               User Workspaces & IDEs                              |
+|             (Claude Code CLI / Antigravity IDE / Cursor / AGY Runtimes)           |
++-----------------------------------------+-----------------------------------------+
+                                          |
+                       Auto-Discovery & Skill Resolution
+                                          |
+       +----------------------------------+----------------------------------+
+       |                                  |                                  |
+       v                                  v                                  v
++--------------+                   +--------------+                   +--------------+
+| Target Local |                   | User Global  |                   | My Custom    |
+| Project      |                   | Config       |                   | Skills       |
+| .claude/     |                   | ~/.gemini/   |                   | my-custom-   |
+| .agents/     |                   | ~/.claude/   |                   | skills/      |
++-------+------+                   +-------+------+                   +-------+------+
+        ^                                  ^                                  ^
+        |                                  |                                  |
+        +----------------------------------+----------------------------------+
+                                           |
+                            Copy / Symlink Skill Modules
+                                           |
++------------------------------------------+------------------------------------------+
+|                        13 Git Submodule Toolkits                                   |
+|  +--------------------+  +-------------------+  +--------------------------------+  |
+|  |  Ay-Skills         |  |  ECC              |  |  awesome-claude-code           |  |
+|  +--------------------+  +-------------------+  +--------------------------------+  |
+|  |  awesome-toolkit   |  |  awesome-skills   |  |  claude-code-action            |  |
+|  +--------------------+  +-------------------+  +--------------------------------+  |
+|  |  claude-best-prac  |  |  claude-code-mcp  |  |  claude-code-ultimate-guide    |  |
+|  +--------------------+  +-------------------+  +--------------------------------+  |
+|  |  claude-context    |  |  claude-skills    |  |  github-mcp-server             |  |
+|  +--------------------+  +-------------------+  +--------------------------------+  |
+|  |  superpowers       |                                                          |  |
+|  +--------------------+                                                          |  |
++-------------------------------------------------------------------------------------+
 ```
-
-### Component Flow Description
-
-1. **Invocation**: The user or continuous integration workflow invokes `claude` or an harness entry point like `ecc-universal`.
-2. **Context & Environment Resolution**: The runtime loads local `CLAUDE.md`, `.agents/skills/`, and `GEMINI.md` rules. `claude-context` constructs a compressed AST index of the working tree.
-3. **Workflow & Harness Orchestration**: The harness (`ECC`) registers event lifecycle hooks and security filters (`ecc-agentshield`). `superpowers` guides the agent through structured brainstorming, specification, and execution phases.
-4. **Subagent & Tool Execution**: Task-specific skills (from `Ay-Skills-main`, `awesome-claude-skills-master`, or `claude-skills-main`) are dynamically loaded. External operations pass through MCP servers (`github-mcp-server-main`, browser runtimes) subject to authorization rules.
-5. **Verification & Delivery**: Subagent edits are checked against unit test suites (TDD) before final changes are accepted and committed.
 
 ---
 
 ## Repository Structure
 
 ```text
-.
-├── Ay-Skills-main/                 # Modular Claude Code skills built by AY Automate
-├── ECC-main/                       # Everything Claude Code (ECC) agent harness OS & CLI tools
-├── awesome-claude-code-main/       # Curated index of Claude Code plugins, skills, and tools
-├── awesome-claude-code-toolkit-main/ # CLI utilities, presets, and workflow scripts
-├── awesome-claude-skills-master/   # Community library of production-grade domain skills
-├── claude-code-action-main/        # GitHub Action runner for automated PR and issue workflows
-├── claude-code-best-practice-main/ # Engineering rules, prompt templates, and architecture guides
-├── claude-code-mcp-main/           # MCP server configurations and connection launchers
-├── claude-code-ultimate-guide-main/# Master technical documentation, quiz suites, and reference specs
-├── claude-context-master/          # Codebase context packing and repository mapping utility
-├── claude-skills-main/             # Enterprise multi-agent skills (Engineering, Compliance, C-Level)
-├── github-mcp-server-main/         # Official Node.js/TypeScript GitHub Model Context Protocol server
-└── superpowers-main/               # Agentic workflow engine enforcing TDD and subagent planning
+claude-code-toolkit/
+├── .gitmodules                      # Version-controlled Git submodule mappings for 13 repositories
+├── package.json                     # Monorepo update script entry points
+├── scripts/
+│   └── update-all.sh                # Executable shell script to update all submodules recursively
+├── my-custom-skills/                # Isolated directory for user custom skills and scripts
+│   ├── README.md                    # Guidelines for personal skill additions
+│   ├── scripts/                     # User helper scripts
+│   └── skills/                      # Custom user skill packages (e.g., skills/<name>/SKILL.md)
+├── Ay-Skills/                       # Submodule: Remotion, Browser Agent, UI/UX, SEO skills
+├── ECC/                             # Submodule: Everything Claude Code agent harness OS & CLI tools
+├── awesome-claude-code/             # Submodule: Curated index of plugins, skills, & resources
+├── awesome-claude-code-toolkit/     # Submodule: CLI utilities, workflows, and presets
+├── awesome-claude-skills/           # Submodule: ComposioHQ production community skill library
+├── claude-code-action/              # Submodule: Official Anthropic GitHub Action runner for CI/CD
+├── claude-code-best-practice/       # Submodule: Engineering standards, rules, and CLAUDE.md guidelines
+├── claude-code-mcp/                 # Submodule: MCP server launcher configurations and setups
+├── claude-code-ultimate-guide/      # Submodule: Master technical guide, quiz suites, and specs
+├── claude-context/                  # Submodule: Codebase AST indexer and context packing engine
+├── claude-skills/                   # Submodule: Enterprise multi-agent skill suite
+├── github-mcp-server/               # Submodule: Official GitHub Model Context Protocol server
+└── superpowers/                     # Submodule: Agentic workflow engine enforcing TDD & subagents
 ```
-
-### Module Summaries
-
-- **`Ay-Skills-main`**: Contains plug-and-play skills for UI generation (`ui-ux-pro-max`), Excalidraw diagramming, Remotion video composition, web scraping (`agent-browser`), and NotebookLM integration.
-- **`ECC-main`**: Provides `ecc-universal` and `ecc-agentshield` Node.js packages to manage agent security, setup hook lifecycles, and enforce strict execution policies.
-- **`awesome-claude-code-main`**: Serves as a reference directory cataloging skills, commands, MCP servers, and hooks across the ecosystem.
-- **`awesome-claude-code-toolkit-main`**: Implements helper CLI scripts and preset configurations to streamline agent workspace initialization.
-- **`awesome-claude-skills-master`**: Offers over 30 specialized skill modules covering design systems, SEO audit pipelines, document parsers, and web testing.
-- **`claude-code-action-main`**: Contains GitHub Actions workflow definitions and container configurations to execute Claude Code in headless CI environments.
-- **`claude-code-best-practice-main`**: Documents operational standards, memory optimization guidelines, and `CLAUDE.md` rule files.
-- **`claude-code-mcp-main`**: Manages MCP server registry configurations and environment boilerplate for database, browser, and API servers.
-- **`claude-code-ultimate-guide-main`**: Includes comprehensive architectural whitepapers, slash command references, interactive quiz suites, and context engineering examples.
-- **`claude-context-master`**: Command-line tool for scanning source repositories, building AST representations, and outputting token-efficient prompt context.
-- **`claude-skills-main`**: Multi-domain enterprise skill framework featuring standard validation pipelines (`SKILL_PIPELINE.md`), compliance tools, and engineering team agents.
-- **`github-mcp-server-main`**: Production MCP server implementation exposing GitHub APIs (repos, issues, pull requests, workflows) as typed agent tools.
-- **`superpowers-main`**: Core workflow framework driving structured development steps from feature specification to subagent implementation and TDD verification.
 
 ---
 
 ## Technology Stack
 
-- **Languages**: TypeScript, JavaScript (ESNext), Python 3.10+, Shell (Bash / Zsh), Go, Markdown.
-- **Runtimes & Frameworks**: Node.js (v18+ / v20+), Claude Code CLI (v2.1+), Express.js, Next.js.
-- **Protocol Specifications**: Model Context Protocol (MCP) Specification.
-- **Tooling & Integrations**: Git, GitHub REST & GraphQL APIs, Docker, npm / npx, PyPI.
+- **Languages**: TypeScript, JavaScript, Python, Bash
+- **Frameworks & Runtimes**: Node.js (>= 18), Python (>= 3.10), Git (>= 2.30)
+- **Agent Engines**: Claude Code CLI, Antigravity IDE, Cursor, AGY
+- **Protocols**: Model Context Protocol (MCP) over Stdio/SSE
 
 ---
 
 ## Prerequisites
 
-Ensure the following tools and environment variables are installed and configured prior to running components in this repository:
+Ensure the following tools are installed on your host system:
 
-- **Node.js**: Version 18.0.0 or higher (`node -v`).
-- **Python**: Version 3.10 or higher (`python3 --version`).
-- **Git**: Version 2.30.0 or higher (`git --version`).
-- **Claude Code CLI**: Installed globally (`npm install -g @anthropic-ai/claude-code`).
-- **Environment Variables**:
-  - `ANTHROPIC_API_KEY`: Required for agent LLM inference calls.
-  - `GITHUB_TOKEN`: Required for `github-mcp-server-main` and GitHub Action runners (with `repo`, `workflow`, and `read:org` scopes).
+- **Node.js**: Version 18.0.0 or higher (`node -v`)
+- **Python**: Version 3.10 or higher (`python3 --version`)
+- **Git**: Version 2.30.0 or higher (`git --version`)
+- **Claude Code CLI**: Installed globally (`npm install -g @anthropic-ai/claude-code`)
 
 ---
 
 ## Installation
 
-### 1. Clone the Repository
+### 1. Clone the Monorepo with Submodules
 
 ```bash
-git clone https://github.com/your-org/claude-skills-workspace.git
-cd claude-skills-workspace
+git clone --recursive https://github.com/your-org/claude-code-toolkit.git
+cd claude-code-toolkit
 ```
 
-### 2. Install Core CLI Runtimes
-
-Install the `ecc-universal` harness tooling and context engine dependencies:
+If already cloned without `--recursive`, initialize all 13 submodules:
 
 ```bash
-# Install ECC Universal CLI globally or via npx
-npx ecc-universal setup
-
-# Install dependencies for GitHub MCP server
-cd github-mcp-server-main
-npm install
-npm run build
-cd ..
-```
-
-### 3. Register Workspace Skills
-
-Copy desired skills into your active project's `.claude/skills/` or `.agents/skills/` directory:
-
-```bash
-# Example: Deploying superpowers and ui-ux-pro-max skills to a target project
-mkdir -p /path/to/target-project/.claude/skills
-cp -r Ay-Skills-main/skills/ui-ux-pro-max /path/to/target-project/.claude/skills/
-cp -r superpowers-main /path/to/target-project/.claude/skills/superpowers
+git submodule update --init --recursive
 ```
 
 ---
@@ -215,138 +162,164 @@ cp -r superpowers-main /path/to/target-project/.claude/skills/superpowers
 
 ### Environment Variables
 
+Configure required API keys in your active shell or `.env` file (never commit `.env` files to Git):
+
 | Variable | Required | Description |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | Yes | API access key for Anthropic Claude models. |
-| `GITHUB_TOKEN` | Yes (for GitHub tools) | Personal Access Token or GitHub App token with repo scopes. |
-| `LOG_LEVEL` | No | Logging verbosity (`debug`, `info`, `warn`, `error`). Default is `info`. |
-| `MCP_PORT` | No | Port for HTTP/SSE MCP server instances. Default varies by server. |
+| `ANTHROPIC_API_KEY` | Yes | Anthropic Claude API key for model inference calls. |
+| `GITHUB_TOKEN` | Optional | GitHub Personal Access Token for `github-mcp-server` (scopes: `repo`, `read:org`). |
+| `LOG_LEVEL` | Optional | Verbosity level (`debug`, `info`, `warn`, `error`). Default: `info`. |
 
-### Configuration Files
+### Registering MCP Servers
 
-- **`~/.gemini/config/mcp_config.json` / `.mcp.json`**: Defines available MCP servers.
-  ```json
-  {
-    "mcpServers": {
-      "github": {
-        "command": "node",
-        "args": ["/absolute/path/to/github-mcp-server-main/dist/index.js"],
-        "env": {
-          "GITHUB_PERSONAL_ACCESS_TOKEN": "your_token_here"
-        }
+To enable the GitHub MCP server in your AI editor or Claude Code, add the following to `~/.gemini/config/mcp_config.json` or `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "node",
+      "args": ["/absolute/path/to/claude-code-toolkit/github-mcp-server/dist/index.js"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "your_github_token_here"
       }
     }
   }
-  ```
-- **`CLAUDE.md` / `AGENTS.md` / `GEMINI.md`**: Project-level agent rules and style standards.
+}
+```
 
 ---
 
-## Running the Project
+## Skill Activation Protocol
 
-### Running Claude Code with Harness & Skills
+### How Agent Skill Auto-Discovery Works
 
-Launch a session within any configured project directory:
+AI agents (Claude Code, Antigravity, AGY) discover skills by scanning specific folders for `SKILL.md` files:
 
-```bash
-claude
-```
+1. **Local Project Level**: `.claude/skills/<skill-name>/SKILL.md` or `.agents/skills/<skill-name>/SKILL.md`
+2. **Global System Level**: `~/.gemini/config/skills/<skill-name>/SKILL.md` or `~/.claude/skills/<skill-name>/SKILL.md`
 
-Upon startup, Claude Code auto-detects `.claude/skills/` and `.agents/skills/` modules.
+### Activating a Skill in a Target Project
 
-### Launching the GitHub MCP Server Manually
-
-```bash
-cd github-mcp-server-main
-GITHUB_PERSONAL_ACCESS_TOKEN="your_token" npm start
-```
-
-### Packing Codebase Context
-
-Generate a compressed context file for LLM ingestion:
+To activate any skill from the submodules in a target repository:
 
 ```bash
-cd claude-context-master
-# Generate context summary for the current directory
-npx claude-context . --output context-summary.md
+# Example 1: Copying UI/UX Pro Max skill from Ay-Skills to your project
+mkdir -p /path/to/your-project/.claude/skills
+cp -r /path/to/claude-code-toolkit/Ay-Skills/skills/ui-ux-pro-max /path/to/your-project/.claude/skills/
+
+# Example 2: Activating superpowers TDD workflow engine in your project
+cp -r /path/to/claude-code-toolkit/superpowers /path/to/your-project/.claude/skills/superpowers
+
+# Example 3: Symlinking a skill for live updates
+ln -s /path/to/claude-code-toolkit/Ay-Skills/skills/browser-agent /path/to/your-project/.claude/skills/
 ```
+
+### Creating & Activating Custom Personal Skills
+
+Place your custom skills in `my-custom-skills/skills/`:
+
+```text
+my-custom-skills/
+└── skills/
+    └── my-custom-skill/
+        └── SKILL.md
+```
+
+Structure your `SKILL.md` with standard YAML frontmatter:
+
+```markdown
+---
+name: my-custom-skill
+description: Concise description explaining when the agent should trigger this skill.
+---
+
+# Skill Title
+
+Instructions for the agent go here...
+```
+
+---
+
+## Operational Rules & What NOT to Do
+
+### 🟢 DOs:
+
+- **DO** place all personal, custom skills in `my-custom-skills/skills/`. This guarantees your files are tracked in your monorepo and never lost during submodule updates.
+- **DO** run `npm run update` or `bash scripts/update-all.sh` periodically to fetch upstream security patches and new skills across all 13 submodules.
+- **DO** use relative file links or copy/symlink desired skills into target project repositories (`.claude/skills/` or `.agents/skills/`).
+- **DO** verify executable permissions (`chmod +x`) on shell scripts before running them.
+
+### 🔴 DON'Ts:
+
+- **DON'T edit files directly inside submodule directories** (e.g. `ECC/`, `Ay-Skills/`, `superpowers/`) unless you intend to open a PR upstream. Local changes inside submodule folders will be overwritten or detached during `git submodule update`.
+- **DON'T hardcode API keys or secrets** inside `SKILL.md`, `.mcp.json`, or script files. Always use environment variables (`ANTHROPIC_API_KEY`, `GITHUB_TOKEN`).
+- **DON'T commit `.env` files or credentials** to Git.
+- **DON'T manually delete submodule folders** without removing their entry from `.gitmodules` and running `git submodule deinit`.
 
 ---
 
 ## Usage Examples
 
-### Executing a Superpowers Development Phase
+### 1. Running a Superpowers TDD Workflow
 
-In an active Claude Code session, invoke structured agent workflows:
+In an active Claude Code session in your project:
 
 ```text
-/brainstorm Implement a rate-limiting middleware for the REST API
+/brainstorm Design a rate-limiter middleware for our API endpoints
 ```
 
-The agent will systematically execute:
-1. Architectural concept generation and requirement verification.
-2. Creation of a detailed specification artifact.
-3. Generation of a step-by-step implementation plan.
-4. Delegation of coding tasks to isolated subagents using mandatory TDD.
+The agent triggers `superpowers` to produce spec artifacts, test suites, and subagent implementations.
 
-### Running a UI Design System Generation
+### 2. Indexing Codebase Context with `claude-context`
 
-```text
-Use the ui-ux-pro-max skill to construct a modern dark-mode landing page component library in React.
+Compress codebase AST for LLM consumption:
+
+```bash
+cd claude-context
+npx claude-context /path/to/your-project --output project-summary.md
+```
+
+### 3. Launching GitHub MCP Server
+
+```bash
+cd github-mcp-server
+npm install
+npm run build
+GITHUB_PERSONAL_ACCESS_TOKEN="your_token" npm start
 ```
 
 ---
 
-## Development Workflow
+## Submodule Maintenance & Updates
 
-### Testing
-
-Run test suites within individual sub-modules:
+Update all 13 submodules from their respective upstream GitHub remotes with a single command:
 
 ```bash
-# Test GitHub MCP server
-cd github-mcp-server-main
-npm test
-
-# Test ECC Harness components
-cd ECC-main
-npm test
+npm run update
 ```
 
-### Linting & Formatting
+Alternatively, run the underlying bash script:
 
 ```bash
-# Lint TypeScript files
-cd github-mcp-server-main
-npm run lint
-
-# Format codebase
-npm run format
+bash scripts/update-all.sh
 ```
 
-### Building
+Or run standard Git commands:
 
 ```bash
-# Build TypeScript artifacts across sub-repositories
-cd github-mcp-server-main && npm run build
+git submodule update --init --recursive --remote --merge
 ```
 
 ---
 
-## Docker
+## Docker & MCP Deployment
 
-Docker container images are provided for running isolated MCP servers and CI action environments.
-
-### Building the GitHub MCP Server Container
+Build and run isolated containerized MCP servers:
 
 ```bash
-cd github-mcp-server-main
+cd github-mcp-server
 docker build -t github-mcp-server:latest .
-```
-
-### Running the Container
-
-```bash
 docker run -d \
   -e GITHUB_PERSONAL_ACCESS_TOKEN="your_github_token" \
   -p 3000:3000 \
@@ -356,13 +329,9 @@ docker run -d \
 
 ---
 
-## CI/CD
+## CI/CD Integration
 
-Continuous integration workflows are located in `.github/workflows/` within individual sub-repositories and through `claude-code-action-main`.
-
-### Automated Pull Request Code Review Workflow
-
-Example workflow setup for automated code review (`.github/workflows/claude-review.yml`):
+Use `claude-code-action` to automate PR code reviews in GitHub Actions (`.github/workflows/claude-review.yml`):
 
 ```yaml
 name: Claude Code Auto Review
@@ -375,7 +344,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ./claude-code-action-main
+      - uses: ./claude-code-action
         with:
           anthropic_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -388,40 +357,37 @@ jobs:
 
 | Symptom | Likely Cause | Resolution |
 |---|---|---|
-| `Command not found: claude` | Claude Code CLI is not installed globally | Run `npm install -g @anthropic-ai/claude-code` |
-| `MCP connection refused / timeout` | Invalid server path or missing environment variable | Verify executable path and check `GITHUB_PERSONAL_ACCESS_TOKEN` in `.mcp.json` |
-| `Context window limit exceeded` | Unfiltered file inclusion or large dependency tree | Run `claude-context` to summarize files or add large assets to `.gitignore` / `.claudeignore` |
-| `Permission denied on script execution` | Shell scripts missing execute permissions | Run `chmod +x scripts/*.sh` inside the relevant skill folder |
-| `ecc-universal setup error` | Node.js version prior to 18.0.0 | Upgrade local runtime using `nvm use 18` or higher |
+| **Submodule directory is empty** | Submodules were not initialized during clone | Run `git submodule update --init --recursive` |
+| **Local changes inside submodule overwritten** | Edited code directly inside submodule path | Keep custom edits in `my-custom-skills/` instead |
+| **Skill not detected by agent** | Missing YAML frontmatter or wrong folder path | Ensure file is at `.claude/skills/<name>/SKILL.md` with `name` and `description` frontmatter |
+| **`MCP connection refused`** | Invalid executable path or missing `GITHUB_TOKEN` | Check path in `mcp_config.json` and verify environment variables |
+| **`Permission denied: update-all.sh`** | Executable flag missing | Run `chmod +x scripts/update-all.sh` |
 
 ---
 
-## Performance Notes
+## Performance & Token Economy
 
-- **Token Economy**: Skills rely on progressive disclosure. Only frontmatter metadata (`name` and `description`) is kept in memory until the skill is triggered, preventing token exhaustion.
-- **Subagent Context Isolation**: Subagents spawned by `superpowers` run in isolated context windows, preventing main-session prompt bloat during deep refactoring tasks.
-- **AST Summarization**: `claude-context` reduces raw code file sizes by up to 70% by extracting structural signatures and AST headers before injection.
+- **Progressive Disclosure**: Skills inject only lightweight YAML frontmatter metadata into prompt memory until explicitly invoked.
+- **AST Context Compression**: `claude-context` reduces raw codebase size by up to 70% by extracting structural signatures and AST headers.
+- **Subagent Context Isolation**: Workflow engines (`superpowers`, `ECC`) execute heavy refactoring in isolated subagent context windows, preventing main-session context window degradation.
 
 ---
 
 ## Security Considerations
 
-- **Credential Safeguards**: Secrets and tokens must never be hardcoded into skill files or committed to Git. Use environment variables or local `.mcp.json` configs ignored by VCS.
-- **Terminal Execution Boundaries**: `ECC-main` incorporates `ecc-agentshield` to inspect shell commands prior to execution, preventing destructive filesystem operations (`rm -rf /`, unauthorized network exports).
-- **Least-Privilege API Access**: Limit `GITHUB_TOKEN` scopes to only required repository access when operating GitHub MCP servers or CI workflows.
+- **Credential Safeguards**: Never hardcode tokens in skill instructions or commit `.env` files.
+- **Sandboxed Tooling**: Terminal execution in harnesses (`ECC`) incorporates safety checks to inspect shell commands before execution.
+- **Least-Privilege API Tokens**: Scope `GITHUB_TOKEN` permissions strictly to required resources.
 
 ---
 
 ## Limitations
 
-- **API Key Requirement**: Operating Claude Code and subagent runtimes requires an active Anthropic API key or subscription plan with sufficient quota.
-- **Local Environment Access**: Native shell commands executed by skills require local operating system execution permissions (macOS, Linux, or WSL2 on Windows).
-- **Model Rate Limits**: High-frequency multi-subagent workflows may hit Anthropic tier rate limits during concurrent execution.
+- **API Quota**: Running subagent workflows requires an active Anthropic API key with sufficient quota.
+- **Local OS Execution**: Native shell tools require execution permissions on macOS, Linux, or WSL2.
 
 ---
 
 ## License
 
-Components within this repository are released under their respective open-source licenses:
-- `ECC-main`, `github-mcp-server-main`, `superpowers-main`, `Ay-Skills-main`: Released under the **MIT License**.
-- For third-party skills and sub-modules without an explicit license header, default repository terms apply.
+Components within this repository are released under their respective open-source licenses (primarily **MIT License**). Refer to individual submodule directories for specific third-party license terms.
