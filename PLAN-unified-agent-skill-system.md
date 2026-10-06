@@ -22,16 +22,17 @@ Our goal is to build a **thin, globally accessible orchestration and discovery l
 ## 2. System Requirements & Constraints
 
 ### A. Hard Requirements
-1. **Unify Addressing and Access, Not Methodologies**: The system must preserve each source repository's native installation, discovery, execution, and runtime methodology.
-2. **NO GLOBAL SEMANTIC DISCOVERY**: If the user provides a prompt without an explicit source (e.g. *"Implement feature X"*), the toolkit system MUST NOT search submodules, rank skills across repositories, or load prompt context. The AI agent operates normally without CTK interference.
-3. **Explicit Scoped Discovery**: When a source is identified (e.g., `@ECC`, `@superpowers`, `@custom`), **only** that source is activated, delegating to that source's native discovery mechanics.
-4. **Deterministic Exact Resolution**: Exact artifact addressing (e.g., `@source/artifact`) must resolve deterministically. **Unsafe fuzzy matching is strictly prohibited**. 
+1. **Immutable Read-Only Submodules (CRITICAL INVARIANT)**: Submodules are treated as 100% read-only external dependencies. No CTK file, script, indexer, or installer shall EVER create, edit, or modify any file inside any submodule folder (`ECC/`, `Ay-Skills/`, `superpowers/`, etc.). This guarantees that `git submodule update` or `git pull` runs cleanly without detached HEAD errors, uncommitted file conflicts, or overwritten changes.
+2. **Unify Addressing and Access, Not Methodologies**: The system must preserve each source repository's native installation, discovery, execution, and runtime methodology.
+3. **NO GLOBAL SEMANTIC DISCOVERY**: If the user provides a prompt without an explicit source (e.g. *"Implement feature X"*), the toolkit system MUST NOT search submodules, rank skills across repositories, or load prompt context. The AI agent operates normally without CTK interference.
+4. **Explicit Scoped Discovery**: When a source is identified (e.g., `@ECC`, `@superpowers`, `@custom`), **only** that source is activated, delegating to that source's native discovery mechanics.
+5. **Deterministic Exact Resolution**: Exact artifact addressing (e.g., `@source/artifact`) must resolve deterministically. **Unsafe fuzzy matching is strictly prohibited**. 
    - 0 matches $\rightarrow$ Clear error.
    - 1 match $\rightarrow$ Resolve.
    - $>1$ matches $\rightarrow$ Ambiguity error displaying candidate canonical paths.
-5. **Type-Aware Routing**: Do NOT extract/inject everything as raw Markdown. Skills load via skill loaders; MCP servers register via `mcp_config.json`; CLI tools invoke via terminal commands; CI actions generate workflow files.
-6. **Agent-Agnostic Core (`ctk` CLI)**: The underlying system must be a standalone CLI utility (`ctk`), independent of any specific coding agent. Agent-specific integration layers (adapters) call this core.
-7. **Global System Access**: Setup occurs once inside `claude-code-toolkit` (`./install.sh`). The system is immediately usable from any directory on the user's machine (`cd ~/Projects/app`) without copying toolkit files.
+6. **Type-Aware Routing**: Do NOT extract/inject everything as raw Markdown. Skills load via skill loaders; MCP servers register via `mcp_config.json`; CLI tools invoke via terminal commands; CI actions generate workflow files.
+7. **Agent-Agnostic Core (`ctk` CLI)**: The underlying system must be a standalone CLI utility (`ctk`), independent of any specific coding agent. Agent-specific integration layers (adapters) call this core.
+8. **Global System Access**: Setup occurs once inside `claude-code-toolkit` (`./install.sh`). The system is immediately usable from any directory on the user's machine (`cd ~/Projects/app`) without copying toolkit files.
 
 ### B. Desirable Features
 - Fast, static/generated capability registry (`~/.config/ctk/registry.json`).
@@ -39,11 +40,11 @@ Our goal is to build a **thin, globally accessible orchestration and discovery l
 - Clean user-space teardown script (`./uninstall.sh`).
 
 ### C. Explicitly Rejected Behavior
+- ❌ **No Submodule Modifications**: ZERO edits inside third-party submodule directories.
 - ❌ **No Global Semantic Search**: No automatic scanning of all `SKILL.md` files across submodules when no source is specified.
 - ❌ **No Schema Flattening**: No converting complex multi-agent harnesses (`ECC`, `superpowers`) into static `SKILL.md` prompts.
 - ❌ **No Unsafe Fuzzy Matching**: No silently guessing between `category-a/foo` and `category-b/foo`.
 - ❌ **No Implicit Multi-Source Merging**: No automatic mixing of competing methodologies (e.g. blending `superpowers` TDD with un-tested prototyping skills).
-- ❌ **No Destructive Submodule Edits**: No modifying third-party submodule files directly.
 
 ---
 
@@ -53,19 +54,19 @@ An empirical inspection of all 15 sources in `claude-code-toolkit` establishes t
 
 | Source Repository | Executable Type | `SKILL.md` Count | Directory Depth Pattern | Build / Runtime Dependencies | Primary Role & Capabilities |
 |---|---|---|---|---|---|
-| **`Ay-Skills`** | Skill Library | 6 | Flat: `skills/<skill>/SKILL.md` | Pure Markdown | Remotion video generation, Puppeteer browser automation, UI/UX tokens, SEO auditing. |
-| **`ECC`** | Harness OS | 934 | Mixed: `skills/`, `plugins/`, `scaffolds/` | `install.sh`, Node.js, Python, `agent.yaml` | Full harness operating system with terminal shims (`ecc-agentshield`), multi-agent task spawning, AST hooks. |
-| **`awesome-claude-code`** | Curation Index | 0 | Flat Markdown Curation Index | Python (`generate_readme.py`), `Makefile` | Curation index of external Claude Code plugins, workflows, and resources. Passive reference. |
-| **`awesome-claude-code-toolkit`** | Preset Registry | 40 | Flat: `skills/<skill>/SKILL.md` | Manifests, `.claude-plugin`, `.mcp.json` | Pre-configured MCP server configs, agent rules, workflow presets. |
-| **`awesome-claude-skills`** | Skill Library | 864 | **2-Level Nested**: `<category>/<skill>/SKILL.md` | Pure Markdown | Composio skill collection covering 800+ API integrations, document processing (XLSX, PDF, PPTX, DOCX), resume generation. |
-| **`claude-code-action`** | CI/CD Runner | 0 | Action Codebase (`base-action/`) | Bun runtime, `package.json`, TypeScript | Official Anthropic GitHub Action runner for headless PR code review automation in CI pipelines. |
-| **`claude-code-best-practice`** | Rules / Reference | 0 | Markdown Guidelines & Decks | `CLAUDE.md` templates, tutorials | Engineering guidelines, agent team orchestration standards, code quality rules templates. |
-| **`claude-code-mcp`** | MCP Server Bridge | 0 | Node.js MCP Server | Node.js (>= 20), `package.json`, Claude CLI | Exposes `claude_code:claude_code` tool endpoint over stdio/SSE, allowing non-Claude IDEs (Cursor/Codex/Antigravity) to run Claude CLI. |
-| **`claude-code-ultimate-guide`**| Hybrid Reference | 83 | Nested: `tools/<skill>/SKILL.md` | Markdown docs, quiz runners, Claudedocs | Master technical guide, architecture whitepapers, quiz suites, and 83 structural skill templates. |
-| **`claude-context`** | AST CLI Tool | 0 | Node.js + Python Monorepo | Node.js, `pnpm`, Python, `package.json` | Codebase AST parser and context packing engine providing 70% LLM context compression via `npx claude-context`. |
-| **`claude-skills`** | Enterprise Suite | 388 | **2-Level Nested**: `<domain>/<skill>/SKILL.md` | `pyproject.toml`, `tessl.json`, Python | Enterprise organizational skill suite (C-level advisor, business growth, engineering management). |
-| **`github-mcp-server`** | MCP Server | 0 | Go Server Codebase | Go (>= 1.21), `go.mod`, Dockerfile | Official GitHub Model Context Protocol server exposing native GitHub API tools (`create_issue`, `get_file`, `create_pull_request`). |
-| **`superpowers`** | Workflow Engine | 15 | Flat: `skills/<skill>/SKILL.md` | Node.js, `package.json`, multi-agent manifests | Agentic workflow engine enforcing strict Test-Driven Development (TDD), spec creation (`/brainstorm`, `/plan`), and subagent delegation. |
+| **`Ay-Skills`** | Skill Library | 6 | Flat: `skills/<skill>/SKILL.md` | Pure Markdown | Remotion video generation, Puppeteer browser automation, UI/UX tokens, SEO auditing. Read-only target. |
+| **`ECC`** | Harness OS | 934 | Mixed: `skills/`, `plugins/`, `scaffolds/` | `install.sh`, Node.js, Python, `agent.yaml` | Full harness operating system with terminal shims (`ecc-agentshield`), multi-agent task spawning, AST hooks. Read-only target. |
+| **`awesome-claude-code`** | Curation Index | 0 | Flat Markdown Curation Index | Python (`generate_readme.py`), `Makefile` | Curation index of external Claude Code plugins, workflows, and resources. Passive reference. Read-only target. |
+| **`awesome-claude-code-toolkit`** | Preset Registry | 40 | Flat: `skills/<skill>/SKILL.md` | Manifests, `.claude-plugin`, `.mcp.json` | Pre-configured MCP server configs, agent rules, workflow presets. Read-only target. |
+| **`awesome-claude-skills`** | Skill Library | 864 | **2-Level Nested**: `<category>/<skill>/SKILL.md` | Pure Markdown | Composio skill collection covering 800+ API integrations, document processing (XLSX, PDF, PPTX, DOCX), resume generation. Read-only target. |
+| **`claude-code-action`** | CI/CD Runner | 0 | Action Codebase (`base-action/`) | Bun runtime, `package.json`, TypeScript | Official Anthropic GitHub Action runner for headless PR code review automation in CI pipelines. Read-only target. |
+| **`claude-code-best-practice`** | Rules / Reference | 0 | Markdown Guidelines & Decks | `CLAUDE.md` templates, tutorials | Engineering guidelines, agent team orchestration standards, code quality rules templates. Read-only target. |
+| **`claude-code-mcp`** | MCP Server Bridge | 0 | Node.js MCP Server | Node.js (>= 20), `package.json`, Claude CLI | Exposes `claude_code:claude_code` tool endpoint over stdio/SSE, allowing non-Claude IDEs (Cursor/Codex/Antigravity) to run Claude CLI. Read-only target. |
+| **`claude-code-ultimate-guide`**| Hybrid Reference | 83 | Nested: `tools/<skill>/SKILL.md` | Markdown docs, quiz runners, Claudedocs | Master technical guide, architecture whitepapers, quiz suites, and 83 structural skill templates. Read-only target. |
+| **`claude-context`** | AST CLI Tool | 0 | Node.js + Python Monorepo | Node.js, `pnpm`, Python, `package.json` | Codebase AST parser and context packing engine providing 70% LLM context compression via `npx claude-context`. Read-only target. |
+| **`claude-skills`** | Enterprise Suite | 388 | **2-Level Nested**: `<domain>/<skill>/SKILL.md` | `pyproject.toml`, `tessl.json`, Python | Enterprise organizational skill suite (C-level advisor, business growth, engineering management). Read-only target. |
+| **`github-mcp-server`** | MCP Server | 0 | Go Server Codebase | Go (>= 1.21), `go.mod`, Dockerfile | Official GitHub Model Context Protocol server exposing native GitHub API tools (`create_issue`, `get_file`, `create_pull_request`). Read-only target. |
+| **`superpowers`** | Workflow Engine | 15 | Flat: `skills/<skill>/SKILL.md` | Node.js, `package.json`, multi-agent manifests | Agentic workflow engine enforcing strict Test-Driven Development (TDD), spec creation (`/brainstorm`, `/plan`), and subagent delegation. Read-only target. |
 | **`my-custom-skills`** | Custom Skill Space | Variable | Flat: `skills/<skill>/SKILL.md` | User Markdown & Scripts | User-owned custom skills directory tracked in monorepo, 100% protected from submodule git resets. |
 | **`maniadav-agent-workspace`**| Rules Workspace | 1 | Multi-Agent Rules Folders | Markdown (`antigravity/`, `cursor/`, `copilot/`) | Local reference rules implementation standardizing engineering principles across Antigravity (`AGENTS.md`), Cursor (`.cursorrules`), Copilot. |
 
@@ -110,73 +111,6 @@ capabilities:
   - cli-tool             # Executable binary invoked via shell
   - ci-runner            # GitHub Actions container runner
   - reference-rules      # Engineering standards and system prompts
-```
-
-### Registry Capabilities Schema (`registry.yaml` / `registry.json`)
-
-```json
-{
-  "version": "1.0.0",
-  "updated_at": "2026-10-06T15:38:00Z",
-  "sources": {
-    "ECC": {
-      "path": "ECC",
-      "category": "harness-os",
-      "capabilities": ["harness-os", "skill-library", "cli-tool"],
-      "entry_point": "ECC/install.sh",
-      "native_cli": "ecc-universal",
-      "supports_exact_resolution": true
-    },
-    "superpowers": {
-      "path": "superpowers",
-      "category": "workflow-engine",
-      "capabilities": ["workflow-engine", "skill-library"],
-      "entry_point": "superpowers/index.js",
-      "supports_exact_resolution": true
-    },
-    "awesome-claude-skills": {
-      "path": "awesome-claude-skills",
-      "category": "skill-library",
-      "capabilities": ["skill-library"],
-      "search_depth": 2,
-      "supports_exact_resolution": true
-    },
-    "claude-code-mcp": {
-      "path": "claude-code-mcp",
-      "category": "mcp-server",
-      "capabilities": ["mcp-server"],
-      "mcp_command": "node",
-      "mcp_args": ["claude-code-mcp/build/index.js"],
-      "supports_exact_resolution": false
-    },
-    "claude-context": {
-      "path": "claude-context",
-      "category": "cli-tool",
-      "capabilities": ["cli-tool"],
-      "exec_command": "npx claude-context",
-      "supports_exact_resolution": false
-    },
-    "github-mcp-server": {
-      "path": "github-mcp-server",
-      "category": "mcp-server",
-      "capabilities": ["mcp-server"],
-      "mcp_command": "github-mcp-server",
-      "supports_exact_resolution": false
-    },
-    "custom": {
-      "path": "my-custom-skills",
-      "category": "skill-library",
-      "capabilities": ["skill-library"],
-      "supports_exact_resolution": true
-    },
-    "workspace-rules": {
-      "path": "maniadav-agent-workspace",
-      "category": "reference-rules",
-      "capabilities": ["reference-rules"],
-      "supports_exact_resolution": true
-    }
-  }
-}
 ```
 
 ---
@@ -234,11 +168,6 @@ When resolving `@source/artifact`:
                                                                         Artifact    List Candidates
 ```
 
-### Exact Resolution Code Logic Specification
-1. **0 Matches**: Returns `ERROR: Artifact '<artifact>' not found in namespace '@<source>'`.
-2. **1 Match**: Resolves canonical file path deterministically.
-3. **>1 Matches**: Returns `ERROR: Ambiguous artifact reference '@<source>/<artifact>'`. Lists all candidate matching paths (e.g. `awesome-claude-skills/document-skills/pdf/SKILL.md` vs `awesome-claude-skills/other-skills/pdf/SKILL.md`) and demands explicit category specifying.
-
 ---
 
 ## 8. Type-Aware Native Delegation Model
@@ -263,7 +192,7 @@ When a user invokes a namespace, CTK delegates execution to the source's native 
 
 ## 9. Global Installation Architecture
 
-Global access from any folder (`cd ~/Projects/my-app`) is achieved without root privileges via user-space binaries and configuration paths:
+Global access from any folder (`cd ~/Projects/my-app`) is achieved without root privileges via user-space binaries and configuration paths outside of submodule trees:
 
 ```text
 Host System Environment ($HOME)
@@ -282,14 +211,6 @@ Host System Environment ($HOME)
         └── skills/
             └── ctk -> ~/.config/ctk/  <-- Symlinked skill adapter for Antigravity IDE / AGY
 ```
-
-### Setup Execution Flow (`./install.sh`)
-1. Detects absolute path of `claude-code-toolkit`.
-2. Verifies Node.js (>= 18), Python (>= 3.10), Git (>= 2.30).
-3. Scans all submodules and generates `~/.config/ctk/registry.json`.
-4. Creates executable wrapper script `~/.local/bin/ctk`.
-5. Prompts user to append `export PATH="$HOME/.local/bin:$PATH"` if not present.
-6. Establishes native symlink adapters for Claude Code, Antigravity, and Cursor.
 
 ---
 
@@ -320,35 +241,7 @@ ctk uninstall                        # Cleanly removes global binaries, symlinks
 
 ---
 
-## 11. Agent Integration Architecture & Compatibility Matrix
-
-Different coding agents possess different native mechanisms for rule discovery and tool execution:
-
-```text
-                       Canonical CTK Core (`ctk`)
-                                   │
-         ┌─────────────────────────┼─────────────────────────┐
-         ▼                         ▼                         ▼
-Claude Code Adapter       Antigravity Adapter         Cursor Adapter
- (~/.claude/skills/)      (~/.gemini/config/)        (.cursor/rules/)
-         │                         │                         │
-         ▼                         ▼                         ▼
-Claude Code CLI           Antigravity IDE / AGY         Cursor IDE
- Native Invocation         Native Invocation         Native Invocation
-```
-
-| Coding Agent | Integration Level | `@` Syntax Support | Native Skill Loading | MCP Support | CTK Adapter Strategy |
-|---|---|---|---|---|---|
-| **Claude Code CLI** | Verified Native | Native via prompt / `/` | `.claude/skills/` | Native stdio/SSE | Symlink `~/.claude/skills/ctk` to `~/.config/ctk/links` |
-| **Antigravity IDE / AGY**| Verified Native | Native via prompt / `@` | `.agents/skills/` | Native stdio/SSE | Symlink `~/.gemini/config/skills/ctk` to registry |
-| **Cursor IDE** | Adapter Required | Native via `@` file attach | `.cursor/rules/*.mdc` | Native stdio/SSE | Generate `.cursor/rules/ctk-namespaces.mdc` |
-| **Codex** | Adapter Required | System prompt reference | `.codex/skills/` | Adapter required | Generate `.codex/skills/` proxy links |
-| **OpenCode / Vibe** | Adapter Required | Plugin manifest link | `.agents/skills/` | Native stdio/SSE | Shared `.agents/` adapter link |
-| **GitHub Copilot** | Wrapper Required | Workspace prompt ref | Passive instructions | Unsupported | Generate `.github/copilot-instructions.md` links |
-
----
-
-## 12. Custom Skills Integration (`my-custom-skills/`)
+## 11. Custom Skills Integration (`my-custom-skills/`)
 
 - Directory: `my-custom-skills/skills/<skill-name>/SKILL.md`.
 - Namespace: `@custom/<skill-name>`.
@@ -358,35 +251,24 @@ Claude Code CLI           Antigravity IDE / AGY         Cursor IDE
 
 ---
 
-## 13. `maniadav-agent-workspace` Integration
+## 12. Security, Isolation & Submodule Immutability Guarantees
 
-- Directory: `maniadav-agent-workspace/`.
-- Namespace: `@workspace-rules` or `@maniadav`.
-- Primary Role: Reference implementation for cross-agent engineering standards.
-- Adapter Action:
-  - Antigravity IDE $\rightarrow$ Symlinks `maniadav-agent-workspace/antigravity/` rules to `.agents/rules/`.
-  - Cursor IDE $\rightarrow$ Symlinks `maniadav-agent-workspace/cursor/` rules to `.cursor/rules/`.
-  - GitHub Copilot $\rightarrow$ Symlinks `maniadav-agent-workspace/copilot/` instructions to `.github/copilot-instructions.md`.
+1. **Submodule Immutability**: All 13 submodules are treated as read-only upstream Git references. No file inside any submodule folder is modified by CTK.
+2. **Clean Submodule Pulls**: Because submodules are never modified, `git submodule update --remote --merge` or `npm run update` executes cleanly without uncommitted file conflicts or detached HEAD resets.
+3. **Zero Implicit Context Pollution**: Without explicit `@source` invocation, 0 submodules are loaded.
+4. **Deterministic Resolution**: Ambiguous matches throw explicit errors rather than guessing.
+5. **Credential Safeguards**: Secrets are never written to `registry.json`. All MCP servers read runtime environment variables (`ANTHROPIC_API_KEY`, `GITHUB_TOKEN`).
 
 ---
 
-## 14. Security and Isolation Guarantees
-
-1. **Zero Implicit Context Pollution**: Without explicit `@source` invocation, 0 submodules are loaded.
-2. **Deterministic Resolution**: Ambiguous matches throw explicit errors rather than guessing.
-3. **Credential Safeguards**: Secrets are never written to `registry.json`. All MCP servers read runtime environment variables (`ANTHROPIC_API_KEY`, `GITHUB_TOKEN`).
-4. **Execution Boundaries**: Harness commands (`ECC`) execute under host OS permissions or IDE sandbox restrictions.
-5. **Read-Only Submodule Safety**: Third-party submodules are treated as read-only Git dependencies.
-
----
-
-## 15. Maintenance, Install, and Uninstall Strategy
+## 13. Submodule Update & Teardown Strategy
 
 ### Submodule Updates (`ctk update`)
 Running `ctk update` (or `npm run update`):
 1. Executes `git submodule update --init --recursive --remote --merge`.
-2. Triggers `ctk reindex` to re-scan submodule paths and update `~/.config/ctk/registry.json`.
+2. Triggers `ctk reindex` to re-scan read-only submodule paths and update `~/.config/ctk/registry.json`.
 3. Preserves `my-custom-skills/` without modification.
+4. Guaranteed clean pull because 0 submodule files were edited.
 
 ### Clean Uninstallation (`./uninstall.sh` or `ctk uninstall`)
 1. Removes wrapper binary `~/.local/bin/ctk`.
@@ -396,32 +278,7 @@ Running `ctk update` (or `npm run update`):
 
 ---
 
-## 16. Failure Semantics & Error Messages
-
-```text
-+-------------------------------+-----------------------------------------------------------------------------------+
-| Failure Scenario              | Explicit Error Output                                                             |
-+-------------------------------+-----------------------------------------------------------------------------------+
-| Unknown Namespace             | ERROR: Namespace '@unknown' is not registered.                                    |
-|                               | Run 'ctk list' to view available namespaces.                                      |
-+-------------------------------+-----------------------------------------------------------------------------------+
-| Missing Artifact              | ERROR: Artifact 'foo' not found in namespace '@ECC'.                              |
-|                               | Run 'ctk inspect @ECC' to view available artifacts.                               |
-+-------------------------------+-----------------------------------------------------------------------------------+
-| Ambiguous Artifact Match      | ERROR: Ambiguous artifact reference '@awesome-claude-skills/pdf'.                 |
-|                               | Multiple candidates found:                                                        |
-|                               |   1. awesome-claude-skills/document-skills/pdf/SKILL.md                            |
-|                               |   2. awesome-claude-skills/other-skills/pdf/SKILL.md                               |
-|                               | Specify exact category path: @awesome-claude-skills/document-skills/pdf           |
-+-------------------------------+-----------------------------------------------------------------------------------+
-| Capability Unsupported        | ERROR: Namespace '@github-mcp-server' is an MCP Server, not a skill library.      |
-|                               | Run 'ctk activate @github-mcp-server' to register it in mcp_config.json.          |
-+-------------------------------+-----------------------------------------------------------------------------------+
-```
-
----
-
-## 17. Proposed Directory Structure
+## 14. Proposed Directory Structure
 
 ```text
 claude-code-toolkit/
@@ -434,7 +291,7 @@ claude-code-toolkit/
 ├── scripts/
 │   ├── update-all.sh                # Submodule updater script
 │   └── ctk-cli.js                   # Executable entry point for ctk CLI
-├── ctk/                             # Core CTK Engine (Future Implementation Phase)
+├── ctk/                             # Core CTK Engine (Outside submodules)
 │   ├── registry.js                  # Registry generator & validator
 │   ├── resolver.js                  # Scoped namespace & exact artifact resolver
 │   ├── adapters/
@@ -445,103 +302,35 @@ claude-code-toolkit/
 │   └── templates/
 │       ├── registry.json.template
 │       └── ctk-wrapper.sh
-├── my-custom-skills/                # Personal Custom Skills
+├── my-custom-skills/                # Personal Custom Skills (User Owned)
 │   ├── README.md
 │   ├── scripts/
 │   └── skills/
 │       └── example-skill/
 │           └── SKILL.md
-├── Ay-Skills/                       # Submodule 1
-├── ECC/                             # Submodule 2
-├── awesome-claude-code/             # Submodule 3
-├── awesome-claude-code-toolkit/     # Submodule 4
-├── awesome-claude-skills/           # Submodule 5
-├── claude-code-action/              # Submodule 6
-├── claude-code-best-practice/       # Submodule 7
-├── claude-code-mcp/                 # Submodule 8
-├── claude-code-ultimate-guide/      # Submodule 9
-├── claude-context/                  # Submodule 10
-├── claude-skills/                   # Submodule 11
-├── github-mcp-server/               # Submodule 12
-├── superpowers/                     # Submodule 13
+├── Ay-Skills/                       # Submodule 1 (READ-ONLY)
+├── ECC/                             # Submodule 2 (READ-ONLY)
+├── awesome-claude-code/             # Submodule 3 (READ-ONLY)
+├── awesome-claude-code-toolkit/     # Submodule 4 (READ-ONLY)
+├── awesome-claude-skills/           # Submodule 5 (READ-ONLY)
+├── claude-code-action/              # Submodule 6 (READ-ONLY)
+├── claude-code-best-practice/       # Submodule 7 (READ-ONLY)
+├── claude-code-mcp/                 # Submodule 8 (READ-ONLY)
+├── claude-code-ultimate-guide/      # Submodule 9 (READ-ONLY)
+├── claude-context/                  # Submodule 10 (READ-ONLY)
+├── claude-skills/                   # Submodule 11 (READ-ONLY)
+├── github-mcp-server/               # Submodule 12 (READ-ONLY)
+├── superpowers/                     # Submodule 13 (READ-ONLY)
 └── maniadav-agent-workspace/        # Reference Workspace
 ```
 
 ---
 
-## 18. Architectural Self-Assessment & Challenge
-
-Before proposing implementation, we critically evaluated the architecture against 10 core questions:
-
-1. **Is a centralized resolver actually necessary?**  
-   *Yes*. Without a resolver, deep 2-level skill folders in `awesome-claude-skills` and non-prompt submodules like `claude-code-mcp` fail or inject raw binary/config data into model prompts.
-2. **Can the requirement be achieved more simply with global symlinks alone?**  
-   *No*. Global symlinks flatly dump all 2,000+ `SKILL.md` files into agent memory simultaneously, violating the **No Global Semantic Discovery** rule and causing massive token bloat and skill collisions.
-3. **Which parts genuinely require code?**  
-   Only the lightweight CLI resolver (`ctk-cli.js`) and path index generator (`registry.js`).
-4. **Which parts should remain native to each submodule?**  
-   All execution, subagent spawning, TDD workflow logic, and shims remain 100% inside their respective submodules.
-5. **Is a registry necessary?**  
-   *Yes*, a lightweight generated capability manifest (`registry.json`) is required to map aliases (`@ECC`, `@superpowers`, `@custom`) to absolute paths.
-6. **Should the registry be static or generated?**  
-   *Generated on setup/update*. Static registries break when submodule paths change or new skills are added upstream.
-7. **Should exact artifact indexing exist?**  
-   *Yes*, a lightweight lookup map of unique skill basenames avoids runtime filesystem searching.
-8. **Can `@` namespace actually be supported across target agents?**  
-   *Yes*. Claude Code, Antigravity, and Cursor natively support `@` file/folder references. For agents without native `@` interception, `ctk resolve @source/artifact` provides the fallback.
-9. **What is the smallest architecture that satisfies the requirements?**  
-   A single Node.js script (`ctk-cli.js`) operating on `~/.config/ctk/registry.json` without external npm runtime dependencies.
-10. **What functionality should explicitly NOT be built?**  
-    We explicitly reject building AI skill recommendation engines, automatic prompt merging, or custom skill schema parsers.
-
----
-
-## 19. System Architecture Flowchart
-
-```text
-                        ANY WORKING DIRECTORY (`~/Projects/app`)
-                                           │
-                                           ▼
-                                 User Prompt Injected
-                                           │
-                        Contains Explicit Scoped Source?
-                         /                            \
-                       NO                              YES
-                       /                                \
-             No Action Taken                     CTK Resolver Invoked
-            (0 Submodules Loaded)                (`ctk resolve @source`)
-            Normal Agent Behavior                        │
-                                                         ▼
-                                             Registry Capability Check
-                                             (`~/.config/ctk/registry.json`)
-                                                         │
-         ┌─────────────────────────┬─────────────────────┴───────────────────┬─────────────────────────┐
-         ▼                         ▼                                         ▼                         ▼
-   `skill-library`           `harness-os`                             `mcp-server`               `cli-tool`
-         │                         │                                         │                         │
-         ▼                         ▼                                         ▼                         ▼
-Format SKILL.md for       Execute native entry                   Register server in         Output shell command
-Target Agent Loader       script (install.sh)                    mcp_config.json            (npx claude-context .)
-```
-
----
-
-## 20. Phased Implementation Roadmap
-
-Once approved, implementation will proceed in 5 isolated, testable phases:
-
-- **Phase 1: Foundation**: Create `ctk/registry.js` generator and initial `~/.config/ctk/registry.json` schema.
-- **Phase 2: CLI Core**: Implement `ctk-cli.js` with `list`, `inspect`, `resolve`, and `path` commands.
-- **Phase 3: Type Adapters**: Implement skill loaders, MCP config generators, and workspace rules symlinkers.
-- **Phase 4: Installer & Teardown**: Build `./install.sh` and `./uninstall.sh`.
-- **Phase 5: E2E Verification**: Execute complete empirical verification test suite across Claude Code, Antigravity, and Cursor.
-
----
-
-## 21. Decision Table
+## 15. Decision Table
 
 | Decision Item | Recommendation | Empirical Evidence | Approval Required |
 |---|---|---|---|
+| **Submodule Immutability** | Submodules are 100% read-only; CTK files live outside submodules | Guarantees `git submodule update` runs cleanly without file reset conflicts | Required |
 | **Global Installation Model** | User-space binaries (`~/.local/bin/ctk`) and global config (`~/.config/ctk/`) | Avoids `/usr/local/bin` root privileges, fully compatible with macOS zsh | Required |
 | **Namespace Syntax** | `@<source>` and `@<source>/<artifact>` (e.g. `@ECC`, `@superpowers`, `@custom/db-migration`) | Matches native UI auto-complete in Cursor, Antigravity, and Claude Code | Required |
 | **Canonical CLI Core** | Lightweight Node.js CLI script (`scripts/ctk-cli.js`) | Node.js (>= 18) is a verified prerequisite; avoids extra compilation steps | Required |
@@ -553,16 +342,17 @@ Once approved, implementation will proceed in 5 isolated, testable phases:
 
 ---
 
-## 22. Approval Required
+## 16. Approval Required
 
 > [!IMPORTANT]
 > **Implementation has NOT been performed.**
 >
 > The following decision items require your explicit confirmation before implementation begins:
 >
-> 1. **User-Space Global Installation**: Approve installing global CLI to `~/.local/bin/ctk` and global config to `~/.config/ctk/registry.json`.
-> 2. **Namespace & Exact Addressing Syntax**: Approve `@<source>` and `@<source>/<artifact>` addressing conventions.
-> 3. **Single Active Source Policy (v1)**: Approve strictly enforcing one active source at a time to prevent workflow collisions.
-> 4. **Initial Agent Adapter Scope**: Approve initial target adapters for **Claude Code CLI**, **Antigravity IDE / AGY**, and **Cursor IDE**.
+> 1. **Immutable Submodule Guarantee**: Approve treating all submodules as read-only upstream Git references, writing zero files inside submodule folders.
+> 2. **User-Space Global Installation**: Approve installing global CLI to `~/.local/bin/ctk` and global config to `~/.config/ctk/registry.json`.
+> 3. **Namespace & Exact Addressing Syntax**: Approve `@<source>` and `@<source>/<artifact>` addressing conventions.
+> 4. **Single Active Source Policy (v1)**: Approve strictly enforcing one active source at a time to prevent workflow collisions.
+> 5. **Initial Agent Adapter Scope**: Approve initial target adapters for **Claude Code CLI**, **Antigravity IDE / AGY**, and **Cursor IDE**.
 >
 > Once approved, implementation will execute according to the 5-phase roadmap.
