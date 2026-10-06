@@ -1,0 +1,22 @@
+---
+description: CTK Namespaces & Scoped Agent Rules
+globs: "*"
+---
+
+# CTK Namespace Reference
+
+- **@Ay-Skills**: skill-library (/Users/manishyadav/Documents/code/maniadav/claude-code-toolkit/Ay-Skills)
+- **@ECC**: harness-os (/Users/manishyadav/Documents/code/maniadav/claude-code-toolkit/ECC)
+- **@awesome-claude-code**: reference-rules (/Users/manishyadav/Documents/code/maniadav/claude-code-toolkit/awesome-claude-code)
+- **@awesome-claude-code-toolkit**: hybrid (/Users/manishyadav/Documents/code/maniadav/claude-code-toolkit/awesome-claude-code-toolkit)
+- **@awesome-claude-skills**: skill-library (/Users/manishyadav/Documents/code/maniadav/claude-code-toolkit/awesome-claude-skills)
+- **@claude-code-action**: ci-runner (/Users/manishyadav/Documents/code/maniadav/claude-code-toolkit/claude-code-action)
+- **@claude-code-best-practice**: reference-rules (/Users/manishyadav/Documents/code/maniadav/claude-code-toolkit/claude-code-best-practice)
+- **@claude-code-mcp**: mcp-server (/Users/manishyadav/Documents/code/maniadav/claude-code-toolkit/claude-code-mcp)
+- **@claude-code-ultimate-guide**: hybrid (/Users/manishyadav/Documents/code/maniadav/claude-code-toolkit/claude-code-ultimate-guide)
+- **@claude-context**: cli-tool (/Users/manishyadav/Documents/code/maniadav/claude-code-toolkit/claude-context)
+- **@claude-skills**: skill-library (/Users/manishyadav/Documents/code/maniadav/claude-code-toolkit/claude-skills)
+- **@github-mcp-server**: mcp-server (/Users/manishyadav/Documents/code/maniadav/claude-code-toolkit/github-mcp-server)
+- **@superpowers**: workflow-engine (/Users/manishyadav/Documents/code/maniadav/claude-code-toolkit/superpowers)
+- **@custom**: skill-library (/Users/manishyadav/Documents/code/maniadav/claude-code-toolkit/my-custom-skills)
+- **@workspace-rules**: reference-rules (/Users/manishyadav/Documents/code/maniadav/claude-code-toolkit/maniadav-agent-workspace)
