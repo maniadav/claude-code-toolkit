@@ -1,0 +1,39 @@
+[submodule "Ay-Skills"]
+	path = Ay-Skills
+	url = https://github.com/walidboulanouar/Ay-Skills.git
+[submodule "ECC"]
+	path = ECC
+	url = https://github.com/affaan-m/ECC.git
+[submodule "awesome-claude-code"]
+	path = awesome-claude-code
+	url = https://github.com/hesreallyhim/awesome-claude-code.git
+[submodule "awesome-claude-code-toolkit"]
+	path = awesome-claude-code-toolkit
+	url = https://github.com/rohitg00/awesome-claude-code-toolkit.git
+[submodule "awesome-claude-skills"]
+	path = awesome-claude-skills
+	url = https://github.com/ComposioHQ/awesome-claude-skills.git
+[submodule "claude-code-action"]
+	path = claude-code-action
+	url = https://github.com/anthropics/claude-code-action.git
+[submodule "claude-code-best-practice"]
+	path = claude-code-best-practice
+	url = https://github.com/shanraisshan/claude-code-best-practice.git
+[submodule "claude-code-mcp"]
+	path = claude-code-mcp
+	url = https://github.com/steipete/claude-code-mcp.git
+[submodule "claude-code-ultimate-guide"]
+	path = claude-code-ultimate-guide
+	url = https://github.com/FlorianBruniaux/claude-code-ultimate-guide.git
+[submodule "claude-context"]
+	path = claude-context
+	url = https://github.com/zilliztech/claude-context.git
+[submodule "claude-skills"]
+	path = claude-skills
+	url = https://github.com/alirezarezvani/claude-skills.git
+[submodule "github-mcp-server"]
+	path = github-mcp-server
+	url = https://github.com/github/github-mcp-server.git
+[submodule "superpowers"]
+	path = superpowers
+	url = https://github.com/obra/superpowers.git

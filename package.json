@@ -1,0 +1,9 @@
+{
+  "name": "claude-code-toolkit",
+  "version": "1.0.0",
+  "description": "Comprehensive Claude Code toolkit, skills monorepo, MCP servers, and agent workflows.",
+  "scripts": {
+    "update": "git submodule update --init --recursive --remote --merge",
+    "update:all": "bash scripts/update-all.sh"
+  }
+}
