@@ -99,6 +99,13 @@ const SOURCE_METADATA = {
     category: 'reference-rules',
     capabilities: ['reference-rules'],
     supports_exact_resolution: true
+  },
+  'Gravitas': {
+    category: 'reliability-runtime',
+    capabilities: ['skill-library', 'reference-rules', 'plugin-bundle'],
+    entry_point: 'Gravitas/dist/gravitas-antigravity',
+    supports_exact_resolution: true,
+    search_depth: 2
   }
 };
 
@@ -109,7 +116,7 @@ function indexSkills(sourceDir, maxDepth = 2, currentDepth = 0) {
   try {
     const entries = fs.readdirSync(sourceDir, { withFileTypes: true });
     for (const entry of entries) {
-      if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+      if (entry.name.startsWith('.') || entry.name === 'node_modules' || entry.name === 'dist' || entry.name === 'build') continue;
       const fullPath = path.join(sourceDir, entry.name);
       if (entry.isDirectory()) {
         const skillFile = path.join(fullPath, 'SKILL.md');

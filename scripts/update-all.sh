@@ -3,4 +3,4 @@ set -e
 
 echo "🔄 Updating all submodules from upstream remotes..."
 git submodule update --init --recursive --remote --merge
-echo "✅ All 13 repositories updated successfully!"
+echo "✅ All 14 repositories updated successfully!"

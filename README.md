@@ -1,6 +1,6 @@
 # Claude Code Toolkit
 
-Comprehensive monorepo bringing together 13 production-grade open-source Claude Code toolkits, agent harnesses, Model Context Protocol (MCP) servers, workflow engines, and enterprise skill suites. Designed for developers and AI engineers operating Claude Code CLI, Antigravity IDE, Cursor, and AGY agents.
+Comprehensive monorepo bringing together 14 production-grade open-source Claude Code toolkits, agent harnesses, Model Context Protocol (MCP) servers, workflow engines, and enterprise skill suites. Designed for developers and AI engineers operating Claude Code CLI, Antigravity IDE, Cursor, and AGY agents.
 
 ---
 
@@ -31,14 +31,14 @@ Comprehensive monorepo bringing together 13 production-grade open-source Claude 
 
 ## Project Overview
 
-The **Claude Code Toolkit** is a centralized engineering workspace created to organize, manage, and execute top-tier Claude Code agent resources. Instead of managing fragmented repositories, this monorepo attaches 13 open-source toolkits as version-controlled Git submodules while maintaining an isolated workspace for personal custom skills.
+The **Claude Code Toolkit** is a centralized engineering workspace created to organize, manage, and execute top-tier Claude Code agent resources. Instead of managing fragmented repositories, this monorepo attaches 14 open-source toolkits as version-controlled Git submodules while maintaining an isolated workspace for personal custom skills.
 
 ---
 
 ## Key Features
 
 - **Auto-Discovery Compatible**: Follows native standard skill directory conventions (`.claude/skills/`, `.agents/skills/`, and `~/.gemini/config/skills/`).
-- **13 Managed Submodules**: Includes industry-standard skill registries, harness engines (`ECC`), context indexers (`claude-context`), TDD frameworks (`superpowers`), and official MCP servers.
+- **14 Managed Submodules**: Includes industry-standard skill registries, harness engines (`ECC`), context indexers (`claude-context`), TDD frameworks (`superpowers`), reliability runtimes (`Gravitas`), and official MCP servers.
 - **Single-Command Upgrades**: Includes automated update tooling (`npm run update` or `bash scripts/update-all.sh`) to synchronize all submodules recursively.
 - **Isolated Custom Skill Space**: Dedicated `my-custom-skills/` folder untouched by external git submodule pulls.
 - **MCP Server Launchers**: Ready-to-use configurations for running GitHub and general MCP servers.
@@ -64,6 +64,7 @@ Below is a detailed breakdown of all submodules, their classification, what prob
 | **`claude-skills`**               | Enterprise Multi-Agent Suite (380+ Skills) | Enterprise workflow automation (C-level, PM, dev teams)             | Tessl & Gemini compatible skills across management/engineering                         | Copy skills from domain dirs (`c-level-advisor`, `engineering-team`)               |
 | **`github-mcp-server`**           | Official GitHub MCP Server (Go)            | Direct AI agent interaction with GitHub API                         | Native GitHub tools (`create_issue`, `get_file`, `create_pull_request`)          | Build Go binary (`go build ./cmd/...`), add to `mcp_config.json`                   |
 | **`superpowers`**                 | TDD Workflow Engine                        | Enforces strict Test-Driven Development (TDD) & subagents           | Commands`/brainstorm`, `/plan`, `/execute`, multi-agent plugin manifests         | Copy`superpowers` into `.claude/skills/` or `.agents/skills/`                    |
+| **`Gravitas`**                    | Reliability Runtime & Skill Suite          | Enforces verification, proof-based completion, anti-rationalization | Reliability runtime, 4 core skills (gravitas, highstakes, python, typescript), Native Antigravity plugin | Copy/symlink to `~/.gemini/config/skills/` or `~/.gemini/config/plugins/` |
 | **`my-custom-skills`**            | Personal Custom Skill Space                | Protects custom skills from submodule git update resets             | Personal user-owned skill and script repository                                        | Add skills in`my-custom-skills/skills/<name>/SKILL.md`                               |
 | **`maniadav-agent-workspace`**    | Cross-Agent Rules Reference                | Standardizes principles across Antigravity, Cursor, Copilot         | Ready-to-copy rule sets (`AGENTS.md`, `.cursorrules`, `copilot-instructions.md`) | Copy desired rules to target project configuration paths                               |
 
@@ -95,7 +96,7 @@ Below is a detailed breakdown of all submodules, their classification, what prob
                             Copy / Symlink Skill Modules
                                            |
 +------------------------------------------+------------------------------------------+
-|                        13 Git Submodule Toolkits                                   |
+|                        14 Git Submodule Toolkits                                   |
 |  +--------------------+  +-------------------+  +--------------------------------+  |
 |  |  Ay-Skills         |  |  ECC              |  |  awesome-claude-code           |  |
 |  +--------------------+  +-------------------+  +--------------------------------+  |
@@ -105,8 +106,8 @@ Below is a detailed breakdown of all submodules, their classification, what prob
 |  +--------------------+  +-------------------+  +--------------------------------+  |
 |  |  claude-context    |  |  claude-skills    |  |  github-mcp-server             |  |
 |  +--------------------+  +-------------------+  +--------------------------------+  |
-|  |  superpowers       |                                                          |  |
-|  +--------------------+                                                          |  |
+|  |  superpowers       |  |  Gravitas         |                                   |  |
+|  +--------------------+  +-------------------+                                   |  |
 +-------------------------------------------------------------------------------------+
 ```
 
@@ -116,7 +117,7 @@ Below is a detailed breakdown of all submodules, their classification, what prob
 
 ```text
 claude-code-toolkit/
-├── .gitmodules                      # Version-controlled Git submodule mappings for 13 repositories
+├── .gitmodules                      # Version-controlled Git submodule mappings for 14 repositories
 ├── package.json                     # Monorepo update script entry points
 ├── scripts/
 │   └── update-all.sh                # Executable shell script to update all submodules recursively
@@ -127,6 +128,7 @@ claude-code-toolkit/
 ├── maniadav-agent-workspace/        # Cross-agent rule references (Antigravity, Cursor, Copilot)
 ├── Ay-Skills/                       # Submodule: Remotion, Browser Agent, UI/UX, SEO skills
 ├── ECC/                             # Submodule: Everything Claude Code agent harness OS & CLI tools
+├── Gravitas/                        # Submodule: Open-source reliability runtime for coding agents
 ├── awesome-claude-code/             # Submodule: Curated index of plugins, skills, & resources
 ├── awesome-claude-code-toolkit/     # Submodule: CLI utilities, workflows, and presets
 ├── awesome-claude-skills/           # Submodule: ComposioHQ production community skill library
@@ -171,7 +173,7 @@ git clone --recursive https://github.com/your-org/claude-code-toolkit.git
 cd claude-code-toolkit
 ```
 
-If already cloned without `--recursive`, initialize all 13 submodules:
+If already cloned without `--recursive`, initialize all 14 submodules:
 
 ```bash
 git submodule update --init --recursive
@@ -295,7 +297,7 @@ GITHUB_PERSONAL_ACCESS_TOKEN="your_token" ./github-mcp
 
 ## Submodule Maintenance & Updates
 
-Update all 13 submodules from their respective upstream GitHub remotes with a single command:
+Update all 14 submodules from their respective upstream GitHub remotes with a single command:
 
 ```bash
 npm run update

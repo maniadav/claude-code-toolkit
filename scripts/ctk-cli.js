@@ -8,7 +8,7 @@ const { execSync } = require('child_process');
 const { generateRegistry, loadRegistry, REGISTRY_PATH, CONFIG_DIR } = require('../ctk/registry');
 const { resolveQuery } = require('../ctk/resolver');
 const { setupClaudeAdapter } = require('../ctk/adapters/claude');
-const { setupAntigravityAdapter } = require('../ctk/adapters/antigravity');
+const { setupAntigravityAdapter, removeAntigravityAdapter } = require('../ctk/adapters/antigravity');
 const { generateCursorRules } = require('../ctk/adapters/cursor');
 const { updateMcpConfig } = require('../ctk/adapters/mcp');
 
@@ -173,6 +173,7 @@ switch (command) {
 
   case 'uninstall': {
     console.log(`\n🧹 Uninstalling CTK Global System...`);
+    removeAntigravityAdapter();
     const wrapperPath = path.join(os.homedir(), '.local', 'bin', 'ctk');
     if (fs.existsSync(wrapperPath)) fs.unlinkSync(wrapperPath);
     if (fs.existsSync(CONFIG_DIR)) fs.rmSync(CONFIG_DIR, { recursive: true, force: true });

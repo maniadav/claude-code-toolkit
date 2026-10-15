@@ -37,3 +37,6 @@
 [submodule "superpowers"]
 	path = superpowers
 	url = https://github.com/obra/superpowers.git
+[submodule "Gravitas"]
+	path = Gravitas
+	url = https://github.com/udaysharmadev/Gravitas.git
